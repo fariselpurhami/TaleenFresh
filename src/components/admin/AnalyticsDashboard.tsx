@@ -1,4 +1,4 @@
-//  src/components/admin/AnalyticsDashboard.tsx
+// src/components/admin/AnalyticsDashboard.tsx
 
 'use client';
 
@@ -12,9 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell
 } from 'recharts';
 import { TrendingUp, Package, Clock, DollarSign } from 'lucide-react';
 
@@ -57,7 +54,6 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     let totalItemsSold = 0;
     const revenueByDay: Record<string, number> = {};
     const productSales: Record<string, number> = {};
-    const ordersByHour: Record<string, number> = {};
 
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
@@ -66,7 +62,6 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     }).reverse();
 
     last7Days.forEach(day => { revenueByDay[day] = 0; });
-    Array.from({ length: 24 }, (_, i) => { ordersByHour[`${i.toString().padStart(2, '0')}:00`] = 0; });
 
     orders.forEach(order => {
       if (order.status !== 'cancelled') {
@@ -87,7 +82,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
 
     const revenueChart = last7Days.map(day => ({ day, revenue: revenueByDay[day] }));
     const topProducts = Object.entries(productSales)
-      .map(([name, qty]) => ({ name: name.length > 15 ? name.substring(0, 15) + '...' : name, qty }))
+      .map(([name, qty]) => ({ name, qty }))
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5);
 
@@ -103,43 +98,45 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
 
   return (
     <div className="w-full space-y-6" dir="rtl">
-      {/* 1. بطاقات المؤشرات الحيوية (KPI Cards) */}
-      <div className="grid grid-cols-2 gap-4 landscape:grid-cols-4 lg:grid-cols-4">
+      
+      {/* 1. بطاقات المؤشرات الحيوية - تم إلغاء الإجبار الخاص بالـ landscape */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {cards.map((card, i) => (
           <motion.div
             key={card.title}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1, type: 'spring', stiffness: 300 }}
-            className={`flex items-center gap-4 rounded-3xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${card.border}`}
+            className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-3xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${card.border}`}
           >
-            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${card.bg}`}>
-              <card.icon className={`h-6 w-6 ${card.color}`} />
+            <div className={`flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl ${card.bg}`}>
+              <card.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${card.color}`} />
             </div>
-            <div className="flex flex-col justify-center">
-              <p className="text-xs font-bold text-gray-500 mb-1">{card.title}</p>
-              <h3 className="font-mono text-xl font-black text-gray-900 tracking-tight">{card.value}</h3>
+            <div className="flex flex-col justify-center mt-2 sm:mt-0">
+              <p className="text-[11px] sm:text-xs font-bold text-gray-500 mb-1">{card.title}</p>
+              <h3 className="font-mono text-lg sm:text-xl font-black text-gray-900 tracking-tight">{card.value}</h3>
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* 2. المخططات البيانية (Responsive Charts) */}
-      <div className="grid grid-cols-1 gap-6 landscape:grid-cols-3 lg:grid-cols-3">
+      {/* 2. المخططات البيانية */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        
         {/* مخطط الإيرادات (Area Chart) */}
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.4 }}
-          className="col-span-1 flex flex-col rounded-3xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2"
+          className="flex flex-col rounded-3xl border border-gray-100 bg-white p-5 sm:p-6 shadow-sm lg:col-span-2 h-[320px] sm:h-[400px]"
         >
-          <h3 className="mb-6 text-lg font-black text-gray-800 flex items-center gap-2">
+          <h3 className="mb-4 text-lg font-black text-gray-800 flex items-center gap-2 shrink-0">
             <TrendingUp className="h-5 w-5 text-[#2C643E]" />
             مؤشر الإيرادات (آخر 7 أيام)
           </h3>
-          <div className="h-[250px] sm:h-[300px] w-full flex-1">
+          <div className="w-full flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={analyticsData.revenueChart} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+              <AreaChart data={analyticsData.revenueChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2C643E" stopOpacity={0.4} />
@@ -148,7 +145,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold', fontFamily: 'monospace' }} width={50} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold', fontFamily: 'monospace' }} width={60} orientation="left" />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#2C643E', strokeWidth: 1, strokeDasharray: '4 4' }} />
                 <Area type="monotone" dataKey="revenue" name="revenue" stroke="#2C643E" strokeWidth={4} fillOpacity={1} fill="url(#colorRevenue)" activeDot={{ r: 6, strokeWidth: 0, fill: '#2C643E' }} />
               </AreaChart>
@@ -156,34 +153,47 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
           </div>
         </motion.div>
 
-        {/* مخطط المنتجات الأكثر مبيعاً (Bar Chart المعالج) */}
+        {/* مخطط المنتجات الأكثر مبيعاً (Native DOM + Framer Motion) - وداعاً للمشاكل! */}
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.5 }}
-          className="col-span-1 flex flex-col rounded-3xl border border-gray-100 bg-white p-6 shadow-sm"
+          className="flex flex-col rounded-3xl border border-gray-100 bg-white p-5 sm:p-6 shadow-sm lg:col-span-1 h-[320px] sm:h-[400px]"
         >
-          <h3 className="mb-6 text-lg font-black text-gray-800 flex items-center gap-2">
+          <h3 className="mb-2 text-lg font-black text-gray-800 flex items-center gap-2 shrink-0">
             <Package className="h-5 w-5 text-[#2C643E]" />
             المنتجات الأكثر مبيعاً
           </h3>
-          <div className="h-[250px] sm:h-[300px] w-full flex-1">
-            <ResponsiveContainer width="100%" height="100%">
-              {/* تم تحويل المخطط ليكون أفقياً (Horizontal) لحل مشكلة الأسماء الطويلة وتدوير الشاشة */}
-              <BarChart data={analyticsData.topProducts} margin={{ top: 10, right: 0, left: 0, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#4b5563', fontSize: 11, fontWeight: 'bold' }} interval={0} angle={-45} textAnchor="end" height={60} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12, fontFamily: 'monospace' }} width={30} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
-                <Bar dataKey="qty" name="qty" radius={[6, 6, 0, 0]} barSize={32}>
-                  {analyticsData.topProducts.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#2C643E' : '#86efac'} className="transition-all duration-300 hover:opacity-80" />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          
+          <div className="mt-4 flex flex-1 flex-col justify-around gap-3 overflow-y-auto pr-1 custom-scrollbar">
+            {analyticsData.topProducts.map((product, index) => {
+              // حساب النسبة المئوية لملء البار بناءً على أعلى منتج مبيعاً
+              const maxQty = Math.max(...analyticsData.topProducts.map((p) => p.qty), 1);
+              const widthPercentage = `${(product.qty / maxQty) * 100}%`;
+              
+              return (
+                <div key={index} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-bold text-gray-800 truncate pl-2">{product.name}</span>
+                    <span className="font-mono text-xs font-bold text-gray-500 whitespace-nowrap">{product.qty} كجم</span>
+                  </div>
+                  {/* حاوية البار الخلفية */}
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100" dir="rtl">
+                    {/* البار الملون اللي بيكبر بأنيميشن */}
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: widthPercentage }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, ease: "easeOut", delay: index * 0.1 }}
+                      className={`h-full rounded-full ${index === 0 ? 'bg-[#2C643E]' : 'bg-[#86efac]'}`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </motion.div>
+
       </div>
     </div>
   );
