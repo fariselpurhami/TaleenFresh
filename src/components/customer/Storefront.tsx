@@ -1,4 +1,5 @@
 // src/components/customer/Storefront.tsx
+
 'use client';
 
 import { useState, useEffect } from 'react';

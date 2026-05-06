@@ -99,7 +99,6 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
   return (
     <div className="w-full space-y-6" dir="rtl">
       
-      {/* 1. بطاقات المؤشرات الحيوية - تم إلغاء الإجبار الخاص بالـ landscape */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {cards.map((card, i) => (
           <motion.div
@@ -120,10 +119,8 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
         ))}
       </div>
 
-      {/* 2. المخططات البيانية */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         
-        {/* مخطط الإيرادات (Area Chart) */}
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -153,7 +150,6 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
           </div>
         </motion.div>
 
-        {/* مخطط المنتجات الأكثر مبيعاً (Native DOM + Framer Motion) - وداعاً للمشاكل! */}
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -167,7 +163,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
           
           <div className="mt-4 flex flex-1 flex-col justify-around gap-3 overflow-y-auto pr-1 custom-scrollbar">
             {analyticsData.topProducts.map((product, index) => {
-              // حساب النسبة المئوية لملء البار بناءً على أعلى منتج مبيعاً
+      
               const maxQty = Math.max(...analyticsData.topProducts.map((p) => p.qty), 1);
               const widthPercentage = `${(product.qty / maxQty) * 100}%`;
               
@@ -177,9 +173,9 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
                     <span className="font-bold text-gray-800 truncate pl-2">{product.name}</span>
                     <span className="font-mono text-xs font-bold text-gray-500 whitespace-nowrap">{product.qty} كجم</span>
                   </div>
-                  {/* حاوية البار الخلفية */}
+                 
                   <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100" dir="rtl">
-                    {/* البار الملون اللي بيكبر بأنيميشن */}
+                   
                     <motion.div
                       initial={{ width: 0 }}
                       whileInView={{ width: widthPercentage }}
