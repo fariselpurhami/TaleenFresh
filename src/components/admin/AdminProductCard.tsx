@@ -3,8 +3,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import { motion } from 'framer-motion';
-import { Save, AlertCircle, Check } from 'lucide-react';
+import { Save, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function AdminProductCard({ product }: { product: any }) {
@@ -12,82 +11,64 @@ export function AdminProductCard({ product }: { product: any }) {
   const [price, setPrice] = useState(product.price_per_kg.toString());
   const [isAvailable, setIsAvailable] = useState(product.is_available);
   const [isSaving, setIsSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const handleUpdate = async () => {
     setIsSaving(true);
     const { error } = await supabase
       .from('products')
-      .update({ 
-        price_per_kg: parseFloat(price), 
-        is_available: isAvailable 
-      })
+      .update({ price_per_kg: parseFloat(price), is_available: isAvailable })
       .eq('id', product.id);
 
-    if (error) {
-      console.error('Update Error:', error);
-      alert('فشل التحديث: تأكد من صلاحيات قاعدة البيانات');
-      setIsSaving(false);
-    } else {
-      setIsSaving(false);
-      setSaved(true);
-      router.refresh(); // 👈 ده اللي بيخلي السعر يتغير فوراً في كل حتة
-      setTimeout(() => setSaved(false), 2000);
-    }
+    if (!error) router.refresh();
+    setIsSaving(false);
   };
 
   return (
-    <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <img src={product.image_url} alt="" className="w-14 h-14 object-contain bg-gray-50 rounded-2xl" />
-          <div>
-            <h3 className="font-black text-gray-900">{product.name_ar || product.name_en}</h3>
-            <p className="text-xs font-bold text-gray-400 italic">ID: {product.id.slice(0, 8)}</p>
-          </div>
-        </div>
-        
-        {/* Toggle Availability Switch */}
-        <button 
-          onClick={() => {
-            setIsAvailable(!isAvailable);
-            // تحديث لحظي للتوافر بمجرد الضغط
-          }}
-          className={`w-14 h-8 rounded-full p-1 transition-colors ${isAvailable ? 'bg-[#22c55e]' : 'bg-gray-200'}`}
-        >
-          <motion.div 
-            animate={{ x: isAvailable ? 0 : -24 }}
-            className="w-6 h-6 bg-white rounded-full shadow-sm"
-          />
-        </button>
-      </div>
+    <div className={`relative flex items-center bg-white/95 backdrop-blur-xl rounded-[1.75rem] p-3 shadow-[0_10px_40px_rgb(0,0,0,0.04)] border border-gray-100/50 mb-2 transition-all duration-500 ${!isAvailable && 'bg-gray-50/50 grayscale-[0.2]'}`} dir="rtl">
 
-      <div className="flex items-center gap-3">
-        <div className="flex-1 bg-gray-50 rounded-2xl p-1 flex items-center px-4 border border-gray-100">
-          <span className="text-xs font-black text-gray-400 ml-2">ج.م</span>
-          <input 
-            type="number" 
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="w-full bg-transparent py-3 font-black text-lg text-right outline-none"
-          />
-        </div>
-        
+      {/* 1. البلوك الأيمن: أزرار التحكم (ترتيب سيليكون فالي وعرض ثابت لمنع الزحزحة) */}
+      <div className="flex items-center gap-2 shrink-0">
         <button 
           onClick={handleUpdate}
           disabled={isSaving}
-          className="h-14 w-14 bg-[#0D0D0D] text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-all disabled:opacity-50"
+          className="h-12 w-12 shrink-0 bg-[#0D0D0D] text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all disabled:opacity-50 z-20"
         >
           {isSaving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={20} />}
         </button>
-      </div>
-      
-      {!isAvailable && (
-        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded-xl justify-center">
-          <AlertCircle size={14} />
-          <span className="text-[10px] font-black uppercase">المنتج مخفي حالياً عن الزبائن</span>
+
+        {/* حقل السعر (محمي ضد الـ Zoom-in في الآيفون بحجم خط 16px) */}
+        <div className="bg-gray-100/80 rounded-2xl px-2 h-12 flex items-center border border-transparent focus-within:border-[#22c55e] focus-within:bg-white w-[5.5rem] transition-all duration-300">
+          <span className="text-[10px] font-black text-gray-400 ml-1">ج.م</span>
+          <input 
+            type="number" 
+            inputMode="decimal"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="w-full bg-transparent font-black text-[16px] text-center outline-none text-gray-900" 
+          />
         </div>
-      )}
+
+        <button 
+          onClick={() => setIsAvailable(!isAvailable)}
+          className={`h-12 w-12 shrink-0 flex items-center justify-center rounded-2xl transition-all duration-300 ${isAvailable ? 'bg-green-50 text-[#22c55e]' : 'bg-red-50 text-red-400'}`}
+        >
+          {isAvailable ? <Eye size={22} strokeWidth={2.5} /> : <EyeOff size={22} strokeWidth={2.5} />}
+        </button>
+      </div>
+
+      {/* 2. البلوك الأوسط: مساحة الاسم (flex-1 بتضمن إن كل الأسماء تبدأ من نفس الخط بالمسطرة) */}
+      <div className="flex-1 flex flex-col items-start justify-center pr-4 pl-2 overflow-hidden">
+        <h3 className="font-black text-gray-900 text-sm md:text-base mb-1 truncate w-full text-right leading-tight">
+          {product.name_ar || product.name_en}
+        </h3>
+      </div>
+
+      {/* 3. البلوك الأيسر: الصورة (متثبتة على أقصى الشمال) */}
+      <div className="relative w-14 h-14 bg-gradient-to-br from-gray-50 to-white rounded-[1.25rem] p-1.5 shrink-0 shadow-inner flex items-center justify-center border border-gray-100/50">
+        <img src={product.image_url} alt="" className="w-full h-full object-contain drop-shadow-sm" />
+        {!isAvailable && <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] rounded-[1.25rem]" />}
+      </div>
+
     </div>
   );
 }

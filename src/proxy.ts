@@ -1,41 +1,49 @@
 // src/proxy.ts
 import { NextResponse, type NextRequest } from 'next/server';
 
-// التعديل المعماري هنا: تغيير اسم الدالة الأساسية لـ proxy
 export function proxy(req: NextRequest) {
   const url = req.nextUrl;
+  const path = url.pathname;
 
-  // 1. حاجز الأداء (Performance Barrier): 
-  if (url.pathname.startsWith('/_next') || url.pathname.includes('.')) {
+  // 1. حاجز الأداء (Performance Barrier)
+  if (path.startsWith('/_next') || path.includes('.')) {
     return NextResponse.next();
   }
 
-  // 2. حماية مسارات الإدارة (Admin Route Guard)
-  if (url.pathname.startsWith('/admin') && !url.pathname.startsWith('/admin/login')) {
-    
-    // استخراج الكوكي بأمان
-    const adminToken = req.cookies.get('taleen_admin_token')?.value;
-
-    // 3. الأمان المتقدم (Environment Variables)
-    const SECRET_KEY = process.env.ADMIN_SECRET_TOKEN || 'secure_access_2026';
-
-    // 4. بروتوكول الطرد (Bouncer Logic):
-    if (!adminToken || adminToken !== SECRET_KEY) {
-      const loginUrl = new URL('/admin/login', req.url);
-      const response = NextResponse.redirect(loginUrl);
-      
-      // ضربة استباقية: تنظيف أي كوكيز مضروبة
-      response.cookies.delete('taleen_admin_token');
-      
-      return response;
+  // 2. إغلاق الثغرة الأمنية (Strict Security Check)
+  const SECRET_KEY = process.env.ADMIN_SECRET_TOKEN;
+  
+  if (!SECRET_KEY) {
+    console.error('CRITICAL ARCHITECTURAL ERROR: ADMIN_SECRET_TOKEN is missing!');
+    // نمنع الدخول تماماً إذا نسيت وضع المتغير في الـ Environment
+    if (path.startsWith('/admin')) {
+      return new NextResponse('Internal Server Error: Security Misconfiguration', { status: 500 });
     }
   }
 
-  // السماح بالمرور للطلبات السليمة
+  // استخراج الكوكي بأمان
+  const adminToken = req.cookies.get('taleen_admin_token')?.value;
+  const isAuthenticated = adminToken && adminToken === SECRET_KEY;
+
+  const isLoginRoute = path === '/admin-login';
+  const isAdminRoute = path.startsWith('/admin') && !isLoginRoute;
+
+  // 3. بروتوكول الطرد (Bouncer Logic)
+  if (isAdminRoute && !isAuthenticated) {
+    const loginUrl = new URL('/admin-login', req.url);
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.delete('taleen_admin_token'); // تنظيف أمني
+    return response;
+  }
+
+  // 4. منع الازدواجية
+  if (isLoginRoute && isAuthenticated) {
+    return NextResponse.redirect(new URL('/admin', req.url));
+  }
+
   return NextResponse.next();
 }
 
-// 5. رادار التفتيش (Edge Matcher)
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/admin-login'],
 };

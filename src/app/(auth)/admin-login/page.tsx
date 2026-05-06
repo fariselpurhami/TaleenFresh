@@ -1,19 +1,21 @@
 // src/app/(auth)/admin-login/page.tsx
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, ShieldAlert, KeyRound } from 'lucide-react';
+import { ArrowRight, ShieldAlert, LockKeyhole, Cpu } from 'lucide-react';
 import { verifyAdminPin } from '@/app/actions/auth';
+import { motion, AnimatePresence } from 'framer-motion'; // التأكد من تثبيت framer-motion
 
 export default function AdminLogin() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeLogin = () => {
+    if (pin.length !== 4 || isPending) return;
 
     startTransition(async () => {
       const formData = new FormData();
@@ -23,8 +25,12 @@ export default function AdminLogin() {
 
       if (result?.error) {
         setError(true);
-        setPin('');
-        setTimeout(() => setError(false), 2000);
+        setPin(''); 
+        // تركيز تلقائي بعد الخطأ لراحة المدير
+        setTimeout(() => {
+            setError(false);
+            inputRef.current?.focus();
+        }, 2500);
       } else if (result?.success) {
         router.refresh();
         router.push('/admin');
@@ -32,90 +38,155 @@ export default function AdminLogin() {
     });
   };
 
+  // الدخول التلقائي الذكي
+  useEffect(() => {
+    if (pin.length === 4) {
+      executeLogin();
+    }
+  }, [pin]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeLogin();
+  };
+
   return (
-    <main dir="rtl" className="min-h-[100dvh] bg-[#f8f9fa] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* خلفية جمالية مستوحاة من ألوان المتجر */}
-      <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-[#22c55e]/20 via-[#22c55e]/5 to-transparent -z-10" />
-      <div className="absolute -top-32 -right-32 w-96 h-96 bg-[#22c55e]/10 rounded-full blur-3xl -z-10" />
+    <main dir="rtl" className="min-h-[100dvh] bg-[#0A0F0D] flex items-center justify-center p-5 relative overflow-hidden font-sans selection:bg-[#22c55e]/30 selection:text-white">
+      
+      {/* 1. الجسيمات المضيئة في الخلفية (Ambient Glowing Orbs) */}
+      <motion.div 
+        animate={{ 
+            scale: [1, 1.1, 1],
+            opacity: [0.3, 0.5, 0.3],
+            rotate: [0, 90, 0]
+        }}
+        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+        className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] max-w-[600px] max-h-[600px] bg-gradient-to-br from-[#22c55e]/20 to-transparent blur-[100px] rounded-full pointer-events-none" 
+      />
+      <motion.div 
+        animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.2, 0.4, 0.2],
+            translateY: [0, -50, 0]
+        }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] max-w-[500px] max-h-[500px] bg-gradient-to-tr from-[#16a34a]/20 to-emerald-900/10 blur-[100px] rounded-full pointer-events-none" 
+      />
 
-      <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgb(0,0,0,0.06)] border border-gray-100 overflow-hidden relative">
+      {/* 2. البطاقة الزجاجية المركزية (The Glassmorphism Core) */}
+      <motion.div 
+        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, type: "spring", bounce: 0.4 }}
+        className="w-full max-w-[420px] bg-white/5 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden relative z-10 before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/10 before:to-transparent before:pointer-events-none"
+      >
         
-        {/* الهيدر الفخم مع اللوجو */}
-        <div className="pt-12 pb-6 px-8 text-center flex flex-col items-center">
-          {/* دائرة الأيقونة (بديلة للوجو حالياً) */}
-          <div className="relative w-20 h-20 rounded-[1.5rem] overflow-hidden border-[3px] border-white shadow-xl bg-white flex items-center justify-center mb-6 transform rotate-3">
-            <img src="/icon-512x512.png" alt="Taleen Fresh Logo" className="w-full h-full object-contain" />
-          </div>
+        {/* شريط زينة علوي (Premium Accent Line) */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#22c55e] to-transparent opacity-70" />
 
-          {/* اللوجو النصي - تالين بالأسود، فريش بالأخضر */}
-          <h1 className="text-3xl font-black tracking-tight mb-2">
-            <span className="text-gray-900">Taleen</span>
-            <span className="text-[#22c55e]">Fresh</span>
+        {/* الهيدر (Header) */}
+        <div className="pt-14 pb-8 px-8 text-center flex flex-col items-center relative z-10">
+          <motion.div 
+            initial={{ scale: 0 }} 
+            animate={{ scale: 1 }} 
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="w-16 h-16 bg-[#22c55e]/10 rounded-2xl flex items-center justify-center border border-[#22c55e]/20 mb-6 shadow-[0_0_20px_rgba(34,197,94,0.2)]"
+          >
+            <Cpu className="text-[#22c55e] w-8 h-8" strokeWidth={1.5} />
+          </motion.div>
+          
+          <h1 className="text-4xl font-black tracking-tight mb-4 text-white drop-shadow-md">
+            Taleen<span className="text-[#22c55e]">Fresh</span>
           </h1>
-          <p className="text-sm font-bold text-gray-400 tracking-wide uppercase">
-            Command Center
-          </p>
+          
+          <div className="flex items-center gap-2 px-4 py-1.5 bg-black/40 rounded-full border border-white/5 shadow-inner">
+            <LockKeyhole size={14} className="text-[#22c55e]" />
+            <span className="text-xs font-bold text-gray-300 tracking-widest uppercase mt-0.5">
+              غرفة العمليات المركزية
+            </span>
+          </div>
         </div>
 
-        {/* فورم الدخول */}
-        <form onSubmit={handleLogin} className="px-8 pb-10">
-          <div className="space-y-8">
-            <div className="relative">
-              <label htmlFor="pin" className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3">
-                <KeyRound size={16} className="text-[#22c55e]" />
-                <span>رمز الدخول السري (PIN)</span>
-              </label>
+        {/* نموذج الإدخال (Form) */}
+        <form onSubmit={handleLogin} className="px-8 pb-12 relative z-10">
+          <div className="space-y-6">
+            <div className="relative flex flex-col items-center">
               
-              <div className="relative">
+              <div className="relative w-full group">
                 <input
+                  ref={inputRef}
                   id="pin"
-                  type="password" // إخفاء الأرقام للسرية
+                  type="password"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   value={pin}
-                  onChange={(e) => setPin(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    if (val.length <= 4) setPin(val);
+                  }}
                   disabled={isPending}
-                  className={`w-full text-center tracking-[1em] text-4xl p-5 border-2 rounded-2xl bg-gray-50 focus:bg-white focus:ring-0 focus:outline-none transition-all duration-300 ${
+                  autoComplete="off"
+                  className={`w-full text-center tracking-[0.7em] indent-[0.7em] text-[40px] font-black py-5 border-2 rounded-[1.5rem] bg-black/20 backdrop-blur-md focus:outline-none transition-all duration-500 font-mono ${
                     error
-                      ? 'border-red-500 bg-red-50 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.2)]'
-                      : 'border-transparent focus:border-[#22c55e] focus:shadow-[0_8px_30px_rgba(34,197,94,0.15)] text-gray-900'
-                  } ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      ? 'border-red-500/50 bg-red-500/10 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.2)]'
+                      : 'border-white/10 focus:border-[#22c55e]/50 focus:bg-black/40 focus:shadow-[0_0_30px_rgba(34,197,94,0.15)] text-white placeholder-gray-600'
+                  } ${isPending ? 'opacity-50 blur-[2px] scale-95' : 'scale-100'}`}
                   placeholder="••••"
                   maxLength={4}
                   autoFocus
                 />
                 
-                {/* رسالة الخطأ المتحركة */}
-                {error && (
-                  <div className="absolute -bottom-8 left-0 right-0 flex items-center justify-center gap-1.5 text-red-500 text-xs font-bold animate-bounce">
-                    <ShieldAlert size={14} />
-                    <span>رمز الدخول غير صحيح</span>
-                  </div>
-                )}
+                {/* تأثير توهج خلف الـ Input */}
+                <div className={`absolute -inset-1 bg-gradient-to-r from-[#22c55e] to-emerald-400 rounded-[1.7rem] blur opacity-0 group-focus-within:opacity-20 transition duration-500 -z-10 ${error ? 'hidden' : 'block'}`} />
               </div>
+
+              {/* إشعار الخطأ بحركة أنيقة */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                    className="absolute -bottom-8 flex items-center justify-center gap-1.5 text-red-400 text-sm font-bold bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20"
+                  >
+                    <ShieldAlert size={14} />
+                    <span>الرمز غير صحيح</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* زر الدخول التفاعلي */}
-            <button
+            {/* الزر الرئيسي (The Action Button) */}
+            <motion.button
               type="submit"
               disabled={isPending || pin.length !== 4}
-              className="relative overflow-hidden w-full bg-gray-900 text-white p-4.5 rounded-2xl font-bold text-lg hover:bg-black transition-all flex items-center justify-center gap-3 group disabled:opacity-50 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-[0_10px_20px_rgba(0,0,0,0.1)] active:scale-[0.98]"
+              whileHover={pin.length === 4 && !isPending ? { scale: 1.02 } : {}}
+              whileTap={pin.length === 4 && !isPending ? { scale: 0.98 } : {}}
+              className={`relative overflow-hidden w-full p-4.5 rounded-2xl font-black text-lg transition-all duration-500 flex items-center justify-center gap-3 mt-4 ${
+                isPending || pin.length !== 4 
+                  ? 'bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-white shadow-[0_10px_30px_rgba(34,197,94,0.3)] border border-[#22c55e]/50 hover:shadow-[0_15px_40px_rgba(34,197,94,0.4)]'
+              }`}
             >
-              {/* تأثير اللمعان (Shine Effect) */}
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:animate-shimmer" />
+              <span className="relative z-10 flex items-center gap-2">
+                {isPending ? (
+                  <span className="animate-pulse">جاري فك التشفير...</span>
+                ) : (
+                  <>
+                    تأكيد الدخول
+                    <ArrowRight className="w-5 h-5" strokeWidth={3} />
+                  </>
+                )}
+              </span>
               
-              <span className="relative z-10">{isPending ? 'جاري التحقق...' : 'دخول للوحة التحكم'}</span>
-              
-              {!isPending && (
-                <ArrowRight 
-                  className="w-5 h-5 relative z-10 group-hover:-translate-x-1.5 transition-transform duration-300" 
-                  strokeWidth={2.5} 
-                />
+              {/* لمعة تتحرك فوق الزر (Shine Effect) */}
+              {pin.length === 4 && !isPending && (
+                <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
               )}
-            </button>
+            </motion.button>
           </div>
         </form>
-      </div>
+      </motion.div>
     </main>
   );
 }

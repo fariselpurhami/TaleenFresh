@@ -42,7 +42,7 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
       }`}
     >
       {/* خصم جذاب بتصميم iOS */}
-      <div className="absolute top-0 left-0 bg-gradient-to-br from-[#22c55e] to-green-600 text-white text-[11px] font-black tracking-wide px-3.5 py-1.5 rounded-br-[1.2rem] rounded-tl-[1.5rem] z-10 shadow-sm">
+      <div className="absolute top-0 left-0 bg-gradient-to-br from-[#2C643E] to-green-600 text-white text-[11px] font-black tracking-wide px-3.5 py-1.5 rounded-br-[1.2rem] rounded-tl-[1.5rem] z-10 shadow-sm">
         10% خصم
       </div>
 
@@ -68,11 +68,11 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
         {/* السعر مرتب بشكل فخم */}
         <div className="flex flex-col items-start w-full min-w-0">
           <div className="flex items-baseline flex-nowrap w-full text-right truncate">
-            <span className="text-[#22c55e] font-black text-[17px] tracking-tight shrink-1">
+            <span className="text-[#2C643E] font-black text-[17px] tracking-tight shrink-1">
               {price.toFixed(2)}
             </span>
             <div className="flex items-baseline gap-0.5 shrink-0 ml-1.5">
-              <span className="text-[#22c55e] font-bold text-[12px]">ج.م</span>
+              <span className="text-[#2C643E] font-bold text-[12px]">ج.م</span>
               <span className="text-gray-400 text-[11px] font-bold">/كجم</span>
             </div>
           </div>
@@ -83,7 +83,7 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
           onClick={handleAdd}
           disabled={!isAvailable}
           className={`relative overflow-hidden flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl text-white font-bold text-[13px] shadow-sm active:scale-95 transition-all duration-300 disabled:opacity-50 ${
-            isAdded ? 'bg-green-600' : 'bg-[#22c55e] hover:bg-green-600 hover:shadow-md'
+            isAdded ? 'bg-green-600' : 'bg-[#2C643E] hover:bg-green-600 hover:shadow-md'
           }`}
         >
           <AnimatePresence mode="wait">

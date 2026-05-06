@@ -1,9 +1,8 @@
-/* استدعاء محرك Tailwind 4 الجديد بالكامل */
 @import "tailwindcss";
 
-/* توجيه Tailwind الجديد لقراءة الألوان والمتغيرات الخاصة بـ Shadcn 
-  هنا بيتم تحويل الألوان لـ Utilities صالحة للاستخدام في الكود
-*/
+@source "../app";
+@source "../components";
+
 @theme {
   
   --font-arabic: var(--font-noto-kufi);
@@ -154,3 +153,31 @@
     scrollbar-width: none;
   }
 }
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* --- الكود المحدث لحل مشكلة الطبقات --- */
+  .bg-pattern-watermark {
+    position: relative;
+    isolation: isolate;
+  }
+  
+  .bg-pattern-watermark::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1; 
+    background-image: url('/pattern.jpg'); 
+    background-repeat: repeat;
+    background-size: 250px; 
+    opacity: 0.08; 
+    pointer-events: none; 
+  }
+} /* <-- القوس ده هو اللي كان عامل المشكلة كلها */

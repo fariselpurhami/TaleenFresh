@@ -1,20 +1,11 @@
 // src/components/admin/OrdersClient.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { useState, useMemo } from 'react';
+import { useAdminOrders } from '@/providers/AdminOrdersProvider'; // الـ Provider الجديد
+import { useHaptics } from '@/hooks/useHaptics'; // إضافة محرك الاهتزاز
+import { Phone, Clock, MapPin, ShoppingBag, User, Truck, Inbox, PackageCheck, ArchiveRestore } from 'lucide-react';
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -22,244 +13,204 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 
-// --- Type Definitions ---
-interface CartItem {
-  name: string;
-  qty: number;
-  price: number;
-}
-
-interface Order {
-  id: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_address: string;
-  items: CartItem[];
-  total_price: number;
-  status: 'pending' | 'processing' | 'delivered' | 'cancelled';
-  created_at: string;
-}
-
-// --- Status Dictionaries ---
-const statusColors = {
-  pending: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
-  processing: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-  delivered: 'bg-green-100 text-green-800 hover:bg-green-200',
-  cancelled: 'bg-red-100 text-red-800 hover:bg-red-200',
-};
-
-const statusLabels = {
-  pending: 'قيد الانتظار',
-  processing: 'جاري التجهيز',
-  delivered: 'تم التوصيل',
-  cancelled: 'ملغي',
+const statusConfig = {
+  pending: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200', label: 'قيد الانتظار' },
+  processing: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200', label: 'جاري التجهيز' },
+  delivered: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', label: 'تم التوصيل' },
+  cancelled: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', label: 'ملغي' },
 };
 
 const formatCivilianTime = (dateString: string) => {
   const date = new Date(dateString);
-
   const day = date.getDate();
   const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
+  const monthName = months[date.getMonth()];
 
   let hours = date.getHours();
   const minutes = date.getMinutes().toString().padStart(2, '0');
-  const ampm = hours >= 12 ? 'مساءً' : 'صباحاً';
+  const ampm = hours >= 12 ? 'م' : 'ص';
+  hours = hours % 12 || 12;
 
-  // تحويل نظام 24 إلى 12
-  hours = hours % 12;
-  hours = hours ? hours : 12; // لو الساعة 0 (نصف الليل) خليها 12
-
-  return `${day} ${month} ${year} | ${hours}:${minutes} ${ampm}`;
+  return `${day} ${monthName} | ${hours}:${minutes} ${ampm}`;
 };
 
-export default function OrdersClient({ initialOrders }: { initialOrders: Order[] }) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+export default function OrdersClient() {
+  // الاعتماد المعماري على المصدر المركزي (Single Source of Truth)
+  const { orders, updateOrderStatus } = useAdminOrders();
+  const [activeTab, setActiveTab] = useState<'pending' | 'processing' | 'archived'>('pending');
+  
+  // تهيئة الاهتزاز
+  const { trigger } = useHaptics();
 
-  // Audio Alert System
-  const playAlert = () => {
-    if (typeof window !== 'undefined') {
-      const audio = new Audio('/notification.mp3');
-      audio.play().catch((e) => console.log('Audio play blocked by browser:', e));
-    }
-  };
+  const { filteredOrders, pendingCount, processingCount } = useMemo(() => {
+    const pending = orders.filter(o => o.status === 'pending');
+    const processing = orders.filter(o => o.status === 'processing');
+    const archived = orders.filter(o => o.status === 'delivered' || o.status === 'cancelled');
 
-  // Real-time Supabase Subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel('public:orders')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          const newOrder = payload.new as Order;
-          setOrders((current) => [newOrder, ...current]);
-          playAlert(); // Trigger Audio Alert
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          const updatedOrder = payload.new as Order;
-          setOrders((current) =>
-            current.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
-          );
-        }
-      )
-      .subscribe();
+    let currentList = pending;
+    if (activeTab === 'processing') currentList = processing;
+    if (activeTab === 'archived') currentList = archived;
 
-    return () => {
-      supabase.removeChannel(channel);
+    return {
+      filteredOrders: currentList,
+      pendingCount: pending.length,
+      processingCount: processing.length
     };
-  }, []);
-
-  // Update Status Function
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    // Optimistic UI Update for zero-latency feel
-    setOrders((current) =>
-      current.map((o) => (o.id === orderId ? { ...o, status: newStatus as any } : o))
-    );
-
-    // Database Mutation
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: newStatus })
-      .eq('id', orderId);
-
-    if (error) {
-      console.error('Failed to update status:', error);
-      // In a real app, you would rollback the state here if it fails
-    }
-  };
+  }, [orders, activeTab]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader className="bg-gray-50/50">
-            <TableRow>
-              <TableHead className="text-right font-bold text-gray-700">رقم الطلب</TableHead>
-              <TableHead className="text-right font-bold text-gray-700">العميل</TableHead>
-              <TableHead className="text-right font-bold text-gray-700">التاريخ</TableHead>
-              <TableHead className="text-right font-bold text-gray-700">الإجمالي</TableHead>
-              <TableHead className="text-right font-bold text-gray-700">الحالة</TableHead>
-              <TableHead className="text-right font-bold text-gray-700">الإجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {orders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-gray-500">
-                  لا توجد طلبات حالياً.
-                </TableCell>
-              </TableRow>
-            ) : (
-              orders.map((order) => (
-                <TableRow key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                  {/* ID (Truncated for cleaner UI) */}
-                  <TableCell className="font-mono text-sm text-gray-500">
-                    #{order.id.split('-')[0]}
-                  </TableCell>
-                  
-                  {/* Customer Info */}
-                  <TableCell>
-                    <div className="font-semibold text-gray-900">{order.customer_name}</div>
-                    <div className="text-sm text-gray-500" dir="ltr">{order.customer_phone}</div>
-                  </TableCell>
+    <div className="w-full space-y-6 relative" dir="rtl">
+      {/* 1. لوحة التحكم المرجعية (Segmented Control - Sticky & Glassy) */}
+      <div className="sticky top-4 z-40 bg-gray-100/80 backdrop-blur-xl p-1.5 rounded-2xl flex gap-1.5 shadow-sm border border-white/50">
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all duration-300 ${activeTab === 'pending' ? 'bg-white text-amber-600 shadow-[0_4px_12px_rgb(0,0,0,0.05)] scale-[1.02]' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'}`}
+        >
+          <Inbox className="w-4 h-4 hidden sm:block" />
+          <span className="hidden sm:inline">جديد</span>
+          <span className="sm:hidden">جديد</span>
+          {pendingCount > 0 && (
+            <span className="bg-amber-100 text-amber-700 py-0.5 px-2.5 rounded-full text-xs font-bold border border-amber-200/50">
+              {pendingCount}
+            </span>
+          )}
+        </button>
 
-                  {/* Date */}
-                  <TableCell className="text-sm font-bold text-gray-600 whitespace-nowrap" dir="rtl">
+        <button
+          onClick={() => setActiveTab('processing')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all duration-300 ${activeTab === 'processing' ? 'bg-white text-blue-600 shadow-[0_4px_12px_rgb(0,0,0,0.05)] scale-[1.02]' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'}`}
+        >
+          <PackageCheck className="w-4 h-4 hidden sm:block" />
+          <span className="hidden sm:inline">جاري التجهيز</span>
+          <span className="sm:hidden">تجهيز</span>
+          {processingCount > 0 && (
+            <span className="bg-blue-100 text-blue-700 py-0.5 px-2.5 rounded-full text-xs font-bold border border-blue-200/50">
+              {processingCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('archived')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all duration-300 ${activeTab === 'archived' ? 'bg-white text-gray-900 shadow-[0_4px_12px_rgb(0,0,0,0.05)] scale-[1.02]' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'}`}
+        >
+          <ArchiveRestore className="w-4 h-4 hidden sm:block" />
+          <span className="hidden sm:inline">سجل الطلبات</span>
+          <span className="sm:hidden">سجل</span>
+        </button>
+      </div>
+
+      {/* 2. عرض الكروت بشبكة ذكية (Smart Grid System) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredOrders.length === 0 ? (
+          <div className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
+            <ShoppingBag className="w-12 h-12 text-gray-300 mb-4" />
+            <h3 className="text-gray-500 font-bold text-lg">
+              {activeTab === 'pending' ? 'لا توجد طلبات جديدة' : activeTab === 'processing' ? 'لا توجد طلبات قيد التجهيز' : 'سجل الطلبات فارغ'}
+            </h3>
+            <p className="text-gray-400 text-sm mt-1">
+              {activeTab === 'pending' ? 'بانتظار طلبات العملاء القادمة...' : 'العمليات تسير بشكل ممتاز!'}
+            </p>
+          </div>
+        ) : (
+          filteredOrders.map((order) => {
+            const conf = statusConfig[order.status as keyof typeof statusConfig];
+
+            return (
+              <div
+                key={order.id}
+                className={`bg-white rounded-2xl border ${conf.border} shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md relative`}
+              >
+                <div className={`absolute top-0 right-0 bottom-0 w-1.5 ${conf.bg}`} />
+                
+                <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/30 pl-5 pr-6">
+                  <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
+                    <Clock className="w-4 h-4 text-gray-400" />
                     {formatCivilianTime(order.created_at)}
-                  </TableCell>
+                  </div>
+                  <div className="font-mono text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-md">
+                    #{order.id.slice(0, 6)}
+                  </div>
+                </div>
 
-                  {/* Total Price */}
-                  <TableCell className="text-sm text-gray-600">
-                    {order.total_price.toFixed(2)} ج.م
-                  </TableCell>
+                <div className="p-5 space-y-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-gray-100 p-2 rounded-full mt-0.5"><User className="w-4 h-4 text-gray-600" /></div>
+                      <div><p className="text-xs text-gray-400 font-medium mb-0.5">العميل</p><p className="font-bold text-gray-900 text-sm">{order.customer_name}</p></div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="bg-gray-100 p-2 rounded-full mt-0.5"><Phone className="w-4 h-4 text-gray-600" /></div>
+                      <div><p className="text-xs text-gray-400 font-medium mb-0.5">رقم الهاتف</p><p className="font-bold text-gray-900 text-sm font-mono tracking-wide" dir="ltr">{order.customer_phone}</p></div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="bg-gray-100 p-2 rounded-full mt-0.5"><MapPin className="w-4 h-4 text-gray-600" /></div>
+                      <div><p className="text-xs text-gray-400 font-medium mb-0.5">العنوان بالتفصيل</p><p className="font-bold text-gray-900 text-sm leading-relaxed">{order.customer_address}</p></div>
+                    </div>
+                  </div>
 
-                  {/* Status Manager */}
-                  <TableCell>
-                    <Select
-                      defaultValue={order.status}
-                      onValueChange={(val) => updateOrderStatus(order.id, val)}
-                    >
-                      <SelectTrigger className={`w-[140px] border-none font-semibold ${statusColors[order.status]}`}>
-                        <SelectValue placeholder="اختر الحالة" />
-                      </SelectTrigger>
-                      <SelectContent dir="rtl">
-                        {Object.entries(statusLabels).map(([key, label]) => (
-                          <SelectItem key={key} value={key} className="font-medium">
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-
-                  {/* Actions (Order Details Modal) */}
-                  <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="font-semibold text-gray-700 hover:text-black">
-                          التفاصيل
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px] rounded-2xl" dir="rtl">
-                        <DialogHeader>
-                          <DialogTitle className="text-2xl font-black text-gray-900 border-b border-gray-100 pb-4 text-right pl-12 mt-2">تفاصيل الطلب</DialogTitle>
-                        </DialogHeader>
-                        
-                        <div className="space-y-4 pt-4">
-                          {/* Customer Address Card */}
-                          <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                            <h4 className="font-semibold text-gray-500 mb-1 text-sm">العنوان</h4>
-                            <p className="text-gray-900 font-medium">{order.customer_address}</p>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <div className="space-y-3">
+                      {order.items.map((item: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-white border border-gray-200 text-gray-600 font-bold w-6 h-6 flex items-center justify-center rounded-md text-xs shadow-sm">
+                              {item.qty}
+                            </span>
+                            <span className="font-semibold text-gray-800">{item.name}</span>
                           </div>
-
-                          {/* Items List */}
-                          <div>
-                            <h4 className="font-semibold text-gray-500 mb-3 text-sm">المنتجات</h4>
-                            <div className="space-y-3">
-                              {order.items.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-                                  <div>
-                                    <span className="font-bold text-gray-900">{item.name}</span>
-                                    <span className="text-sm text-gray-500 mr-2">x {item.qty} كجم</span>
-                                  </div>
-                                  <div className="font-semibold text-emerald-600">
-                                    {(item.price * item.qty).toFixed(2)} ج.م
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Summary */}
-                          <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                            <span className="font-bold text-gray-700">الإجمالي النهائي</span>
-                            <span className="text-xl font-black text-black">{order.total_price.toFixed(2)} ج.م</span>
-                          </div>
+                          <span className="font-bold text-gray-600 font-mono">{(item.price * item.qty).toFixed(0)} ج</span>
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
+                      ))}
+                      <div className="pt-3 mt-3 border-t border-gray-200 border-dashed flex justify-between items-center text-sm">
+                        <div className="flex items-center gap-2">
+                          <Truck className="w-4 h-4 text-gray-400" />
+                          <span className="font-medium text-gray-500">خدمة التوصيل</span>
+                        </div>
+                        <span className="font-bold text-gray-600 font-mono">25 ج</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                {/* --- تم التحديث هنا فقط (الفوتر الخاص بالـ Select) --- */}
+                <div className="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between mt-auto">
+                  <Select 
+                    value={order.status} 
+                    onValueChange={(val) => {
+                      trigger('light'); // تشغيل الاهتزاز عند تغيير الحالة
+                      updateOrderStatus(order.id, val);
+                    }}
+                  >
+                    <SelectTrigger className={`w-[140px] h-10 text-sm font-bold border border-transparent shadow-sm transition-all duration-200 active:scale-95 ${conf.bg} ${conf.text}`}>
+                      <SelectValue placeholder="الحالة" />
+                    </SelectTrigger>
+                    
+                    <SelectContent dir="rtl" className="rounded-xl shadow-lg border-gray-100 animate-in fade-in-80 zoom-in-95">
+                      {Object.entries(statusConfig).map(([key, config]) => (
+                        <SelectItem 
+                          key={key} 
+                          value={key} 
+                          className="text-right text-sm font-bold cursor-pointer py-3 transition-colors hover:bg-gray-50 focus:bg-gray-100"
+                        >
+                          {config.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="text-left">
+                    <p className="text-[10px] text-gray-400 font-bold mb-0.5 uppercase tracking-wider">الإجمالي شامل</p>
+                    <p className="font-black text-xl text-green-700 font-mono">{order.total_price.toFixed(0)} ج.م</p>
+                  </div>
+                </div>
+                {/* ----------------------------------------------------- */}
+                
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

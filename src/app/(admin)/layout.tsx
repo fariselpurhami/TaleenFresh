@@ -1,29 +1,37 @@
-// src/app/(admin)/layout.tsx
-import '@/app/globals.css';
-import { redirect } from 'next/navigation';
+// src/app/admin/layout.tsx
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { Noto_Kufi_Arabic } from 'next/font/google';
-
-const notoKufi = Noto_Kufi_Arabic({ subsets: ['arabic'], variable: '--font-noto-kufi' });
+import { AdminOrdersProvider } from '@/providers/AdminOrdersProvider';
+import { OrderRadar } from '@/components/admin/OrderRadar';
 
 export const revalidate = 0;
 
-export default async function AdminLayout({ children }: { readonly children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('taleen_admin_token');
-  
-  // حارس البوابة: لو الكوكي مش موجود، اطرده بره
-  if (token?.value !== 'secure_access_2026') {
-    redirect('/admin-login');
-  }
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+ const cookieStore = await cookies();
+ 
+ const supabase = createServerClient(
+   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+   {
+     cookies: {
+       getAll() { return cookieStore.getAll(); },
+     },
+   }
+ );
 
-  return (
-    <html lang="ar" dir="rtl">
-      <body className={`bg-gray-100 min-h-screen ${notoKufi.variable} font-arabic antialiased`}>
-        <div className="max-w-7xl mx-auto p-4">
-          {children}
-        </div>
-      </body>
-    </html>
-  );
+ const { data: initialOrders } = await supabase
+   .from('orders')
+   .select('*')
+   .order('created_at', { ascending: false })
+   .limit(100);
+
+ return (
+   <AdminOrdersProvider initialOrders={initialOrders || []}>
+     <OrderRadar />
+     {/* التأكد من إضافة dir="rtl" هنا لدعم الواجهة العربية من الأساس */}
+     <div className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
+       {children}
+     </div>
+   </AdminOrdersProvider>
+ );
 }
