@@ -22,6 +22,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SENTRY_DISABLE_AUTO_UPLOAD: "true"
       NEXT_DISABLE_ESLINT: "1"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       
     steps:
       - name: 📥 Checkout Code
@@ -30,7 +31,7 @@ jobs:
       - name: ⚙️ Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22' # تم التحديث لأحدث إصدار مستقر لإنهاء التحذير
+          node-version: '24' # تم التحديث لأحدث إصدار مستقر لإنهاء التحذير
           cache: 'npm'
           
       - name: 📦 Install Dependencies
