@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { Save, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { updateProductAction } from '@/app/actions/admin-actions';
 
 export function AdminProductCard({ product }: { product: any }) {
   const router = useRouter();
@@ -14,14 +15,20 @@ export function AdminProductCard({ product }: { product: any }) {
 
   const handleUpdate = async () => {
     setIsSaving(true);
-    const { error } = await supabase
-      .from('products')
-      .update({ price_per_kg: parseFloat(price), is_available: isAvailable })
-      .eq('id', product.id);
+    
+    const result = await updateProductAction(product.id, {
+        price_per_kg: parseFloat(price),
+        is_available: isAvailable
+    });
 
-    if (!error) router.refresh();
+    if (result.success) {
+        router.refresh();
+    } else {
+        alert('فشل في التحديث، راجع الصلاحيات!');
+    }
+    
     setIsSaving(false);
-  };
+};
 
   return (
     <div className={`relative flex items-center bg-white/95 backdrop-blur-xl rounded-[1.75rem] p-3 shadow-[0_10px_40px_rgb(0,0,0,0.04)] border border-gray-100/50 mb-2 transition-all duration-500 ${!isAvailable && 'bg-gray-50/50 grayscale-[0.2]'}`} dir="rtl">

@@ -1,9 +1,8 @@
 // src/app/actions/admin-actions.ts
-
 'use server';
 
-
 import { createClient } from '@supabase/supabase-js';
+import { unstable_noStore as noStore } from 'next/cache';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,13 +12,19 @@ const supabaseAdmin = createClient(
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+    },
+    // السلاح السري لمنع الكاش تماماً في Next.js
+    global: {
+      fetch: (url, options) => {
+        return fetch(url, { ...options, cache: 'no-store' });
+      }
     }
   }
 );
 
 export async function fetchAdminDashboardData() {
+  noStore(); // تأكيد إضافي لقتل الكاش
   try {
- 
     const [productsRes, ordersRes] = await Promise.all([
       supabaseAdmin.from('products').select('*').order('name_en'),
       supabaseAdmin.from('orders').select('*').order('created_at', { ascending: false })
@@ -39,8 +44,8 @@ export async function fetchAdminDashboardData() {
   }
 }
 
-
 export async function updateOrderStatusAction(orderId: string, newStatus: string) {
+  noStore();
   try {
     const { error } = await supabaseAdmin
       .from('orders')
@@ -48,10 +53,25 @@ export async function updateOrderStatusAction(orderId: string, newStatus: string
       .eq('id', orderId);
 
     if (error) throw new Error(error.message);
-
     return { success: true };
   } catch (error: any) {
     console.error('Update Status Error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateProductAction(productId: string, updates: any) {
+  noStore();
+  try {
+    const { error } = await supabaseAdmin
+      .from('products')
+      .update(updates)
+      .eq('id', productId);
+
+    if (error) throw new Error(error.message);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Update Product Error:', error);
     return { success: false, error: error.message };
   }
 }

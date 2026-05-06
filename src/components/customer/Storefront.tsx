@@ -41,7 +41,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
       cartControls.start({
         scale: [1, 1.2, 0.9, 1.1, 1],
         y: [0, -8, 4, -2, 0], 
-        transition: { duration: 0.4, type: "spring", stiffness: 300 }
+        transition: { duration: 0.5, ease: "easeInOut" }
       });
     };
     window.addEventListener('cart-bounce', handleCartBounce);
