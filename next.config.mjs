@@ -1,4 +1,5 @@
 // next.config.mjs
+
 import withSerwistInit from '@serwist/next';
 
 const withSerwist = withSerwistInit({
@@ -9,11 +10,18 @@ const withSerwist = withSerwistInit({
   reloadOnOnline: false,
 });
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   images: {
+    
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
-      { protocol: 'https', hostname: 'aoaruorpozxxtlrphuwf.supabase.co' },
+      { 
+        protocol: 'https', 
+        hostname: 'aoaruorpozxxtlrphuwf.supabase.co',
+        pathname: '/storage/v1/object/public/**', 
+      },
     ],
   },
 };

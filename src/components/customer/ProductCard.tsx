@@ -50,7 +50,9 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
           fill
           className="object-contain transition-transform duration-500 hover:scale-105"
           sizes="(max-width: 768px) 50vw, 33vw"
-          priority={priority}
+	  priority={priority}
+          quality={75}
+	  loading={priority ? "eager" : "lazy"}
         />
       </div>
 
