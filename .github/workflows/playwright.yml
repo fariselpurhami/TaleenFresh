@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ main, master ]
 
-# إلغاء أي اختبارات قديمة تعمل على نفس الـ Branch إذا تم رفع كود جديد بسرعة
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,14 +16,11 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     
-    # المتغيرات البيئية العميقة للحماية والبناء السليم
+    # سحب المفاتيح الحقيقية من خزانة GitHub السرية
     env:
-      NEXT_PUBLIC_SUPABASE_URL: "https://mock-aoaruorpozxxtlrphuwf.supabase.co"
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-key"
-      ADMIN_SECRET_TOKEN: "mock-admin-token"
-      # إيقاف رفع الـ Source Maps لـ Sentry أثناء الـ CI لتسريع الاختبارات
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SENTRY_DISABLE_AUTO_UPLOAD: "true"
-      # إجبار Next.js على تجاهل أخطاء TypeScript والـ ESLint أثناء الـ Build الآلي (لأننا نختبر الـ UI)
       NEXT_DISABLE_ESLINT: "1"
       
     steps:
@@ -34,7 +30,7 @@ jobs:
       - name: ⚙️ Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # تم التحديث لأحدث إصدار مستقر لإنهاء التحذير
           cache: 'npm'
           
       - name: 📦 Install Dependencies
@@ -42,26 +38,19 @@ jobs:
         
       - name: 🎭 Install Playwright Browsers
         run: npx playwright install --with-deps chromium
-        # اكتفينا بـ chromium (Google Chrome) لتسريع الاختبار، 
-        # لأن 90% من أخطاء الـ UI تظهر فيه. يمكنك مسح الكلمة لتثبيت كل المتصفحات.
 
       - name: 🏗️ Build Next.js Application
         run: npm run build
         
-      # تشغيل السيرفر في الخلفية وإطلاق الاختبارات باستخدام مكتبة npm مدمجة
-      # هذه الخطوة تضمن أن Playwright لا يبدأ قبل أن يكون Next.js جاهزاً
       - name: 🧪 Run Playwright E2E Tests
         run: |
-          # تشغيل سيرفر الإنتاج في الخلفية
           npm run start &
-          # انتظار السيرفر حتى يكون جاهزاً (Health Check)
           npx wait-on http://localhost:3000
-          # إطلاق الشبح
           npx playwright test
           
       - name: 📊 Upload Test Results
         uses: actions/upload-artifact@v4
-        if: failure() # اللمسة المعمارية: لا نرفع التقرير (الذي يحتوي فيديوهات وصور) إلا إذا فشل الاختبار!
+        if: failure()
         with:
           name: playwright-failure-report
           path: playwright-report/
