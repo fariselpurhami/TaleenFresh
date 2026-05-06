@@ -40,10 +40,11 @@ test.describe('E-Commerce Critical Flow: Checkout', () => {
 
     // 6. تعبئة بيانات العميل بناءً على حقول الإدخال الحقيقية في نموذجك
     // نستخدم الـ placeholder أو نوع الحقل كمحدد صلب
-    await page.locator('input[type="text"]').fill('فارس المهندس الآلي');
-    await page.locator('input[type="tel"]').fill('01000000000');
-    await page.locator('textarea').fill('سيليكون فالي، كاليفورنيا - اختبار آلي');
-
+        // نستخدم الـ placeholder كمحدد دقيق لا يخطئ
+    await page.getByPlaceholder('الاسم الثلاثي').fill('فارس المهندس الآلي');
+    await page.getByPlaceholder('رقم الهاتف').fill('01000000000');
+    // إذا لم يكن هناك placeholder محدد للعنوان، يمكنك تحديد الـ textarea الموجودة داخل الفورم تحديداً
+    await page.locator('form textarea, #delivery-form textarea').first().fill('سيليكون فالي، كاليفورنيا - اختبار آلي');
     // 7. تأكيد الطلب
     const submitButton = page.locator('button:has-text("تأكيد الطلب")');
     await expect(submitButton).toBeEnabled(); // التأكد أن الزر فعال وليس Disabled
