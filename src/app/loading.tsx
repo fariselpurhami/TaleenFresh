@@ -1,22 +1,18 @@
 // src/app/loading.tsx
-// تم إزالة استيراد React غير الضروري
 
-const SKELETON_ITEMS_COUNT = 8; // عدم استخدام Magic Numbers
+const SKELETON_ITEMS_COUNT = 8; 
 
 export default function Loading() {
   return (
     <div className="w-full min-h-[70vh] p-4 md:p-6 lg:p-8 flex flex-col gap-6 animate-in fade-in duration-500">
       
-      {/* هيدر وهمي */}
       <div className="flex justify-between items-center mb-4">
         <div className="h-8 w-32 bg-neutral-200/60 dark:bg-neutral-800/60 rounded-lg animate-pulse" />
         <div className="h-10 w-10 bg-neutral-200/60 dark:bg-neutral-800/60 rounded-full animate-pulse" />
       </div>
 
-      {/* مساحة إعلانية وهمية */}
       <div className="h-40 md:h-64 w-full bg-neutral-200/60 dark:bg-neutral-800/60 rounded-2xl animate-pulse mb-2" />
 
-      {/* شبكة المنتجات الوهمية */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {Array.from({ length: SKELETON_ITEMS_COUNT }).map((_, i) => (
           <div 

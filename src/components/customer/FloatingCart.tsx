@@ -13,7 +13,7 @@ export function FloatingCart() {
   const [isMounted, setIsMounted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOrdered, setIsOrdered] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(''); // تحديث معماري: إضافة حالة للخطأ بدلاً من Alert
+  const [errorMsg, setErrorMsg] = useState(''); 
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [showScrollArrow, setShowScrollArrow] = useState(false);
 
@@ -28,7 +28,6 @@ export function FloatingCart() {
   const finalTotal = cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0;
   const isFormIncomplete = !customer.name || !customer.phone || !customer.address;
 
-  // 1. إدارة دورة حياة التهيئة
   useEffect(() => {
     setIsMounted(true);
     const handleOpenCart = () => {
@@ -39,20 +38,18 @@ export function FloatingCart() {
     return () => window.removeEventListener('open-cart', handleOpenCart);
   }, [trigger]);
 
-  // 2. جدار حماية السكرول (Scroll Lock)
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
-      setErrorMsg(''); // مسح الخطأ عند الإغلاق
+      setErrorMsg(''); 
     }
     return () => {
       document.body.style.overflow = '';
     };
   }, [isOpen]);
 
-  // 3. المحرك الرياضي لحساب السكرول
   const checkScrollState = () => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -72,7 +69,6 @@ export function FloatingCart() {
     }
   }, [isOpen, items]);
 
-  // 4. الهندسة الديناميكية لارتفاع مربع العنوان
   useEffect(() => {
     const textarea = addressRef.current;
     if (textarea) {
@@ -81,10 +77,9 @@ export function FloatingCart() {
     }
   }, [customer.address]);
 
-  // 5. محرك الإرسال الآمن (تم تطبيق المستوى المعماري العالي هنا)
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0 || isSubmitting) return; // منع الـ Double Submit
+    if (items.length === 0 || isSubmitting) return; 
 
     if (isFormIncomplete) {
       trigger('medium');
@@ -96,7 +91,6 @@ export function FloatingCart() {
     setErrorMsg('');
     trigger('medium');
 
-    // أخذ لقطة ثابتة (Snapshot) لمنع الـ Race Condition
     const snapshotItems = [...items];
     const snapshotTotal = finalTotal;
 
@@ -117,10 +111,10 @@ export function FloatingCart() {
 
     if (error) {
       console.error('Submission Error:', error);
-      setErrorMsg('فشل إرسال الطلب، تأكد من الاتصال بالشبكة.'); // UI Error instead of Alert
+      setErrorMsg('فشل إرسال الطلب، تأكد من الاتصال بالشبكة.'); 
       trigger('error');
       setIsSubmitting(false);
-      return; // توقف هنا ولا تمسح السلة
+      return; 
     }
 
     trigger('success');
@@ -142,9 +136,8 @@ export function FloatingCart() {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* الخلفية المعتمة */}
           <motion.div
-	    key="backdrop" // هام جداً للـ AnimatePresence
+	    key="backdrop" 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -154,7 +147,6 @@ export function FloatingCart() {
 	    style={{ willChange: "opacity" }}
           />
 
-          {/* حاوية السلة - مقاساتك الدقيقة كما هي بالمللي */}
           <motion.div
             initial={{ y: '100%', x: '-50%' }}
             animate={{ y: 0, x: '-50%' }}
@@ -163,7 +155,6 @@ export function FloatingCart() {
             className="fixed bottom-0 left-[50%] z-[70] flex h-auto max-h-[85vh] w-full max-w-[430px] flex-col rounded-t-3xl bg-white shadow-2xl outline-none border-none"
 	    style={{ willChange: "transform" }}
           >
-            {/* رأس السلة */}
             <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
               <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
                 <ShoppingBag className="h-6 w-6 text-[#2C643E]" />
@@ -178,7 +169,6 @@ export function FloatingCart() {
               </button>
             </div>
 
-            {/* منطقة المحتوى القابلة للتمرير */}
             <div
               ref={scrollContainerRef}
               onScroll={checkScrollState}
@@ -210,7 +200,6 @@ export function FloatingCart() {
                     {items.map((item) => (
                       <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
         
-                        {/* تعديل الاسم والسعر على نفس السطر */}
                         <div className="flex min-w-0 flex-1 items-center gap-2">
                           <h4 className="truncate text-sm font-bold text-gray-800">{item.name}</h4>
                           <span className="shrink-0 rounded-md bg-green-50 px-2 py-0.5 text-xs font-bold text-[#2C643E]">
@@ -219,7 +208,6 @@ export function FloatingCart() {
                         </div>
         
                         <div className="flex shrink-0 items-center gap-2" dir="ltr">
-                          {/* إضافة gap-1 وتوسيع w-12 للكمية */}
                           <div className="flex items-center gap-1 rounded-lg border bg-gray-50 p-0.5">
                             <button
                               onClick={() => updateQty(item.id, Math.max(0.5, item.qty - 0.5))}
@@ -248,9 +236,7 @@ export function FloatingCart() {
                     ))}
                   </div>
 
-                  {/* نموذج البيانات */}
                   <div id="delivery-form" className="space-y-4 border-t pt-6 mt-6">
-                    {/* إشعار الخطأ يظهر هنا بشكل أنيق بدون كسر التصميم */}
                     {errorMsg && (
                       <div className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-600 border border-red-100 text-right" dir="rtl">
                         {errorMsg}
@@ -293,10 +279,8 @@ export function FloatingCart() {
               )}
             </div>
 
-            {/* الفوتر وزر الإرسال */}
             {!isOrdered && items.length > 0 && (
               <div className="relative shrink-0 border-t bg-white px-6 py-4 pb-safe">
-                {/* مؤشر البيانات للأسفل */}
                 <AnimatePresence>
                   {showScrollArrow && (
                     <motion.div
@@ -338,7 +322,6 @@ export function FloatingCart() {
               </div>
             )}
             
-            {/* لمستك السحرية كما هي لم تمس */}
             <div className="absolute top-[calc(100%-2px)] left-0 right-0 h-[100px] bg-white pointer-events-none" />
           </motion.div>
         </>

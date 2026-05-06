@@ -2,13 +2,12 @@
 import withSerwistInit from '@serwist/next';
 
 const withSerwist = withSerwistInit({
-  // مسارات الـ PWA
+  
   swSrc: 'src/app/sw.ts',
   swDest: 'public/sw.js',
   disable: process.env.NODE_ENV === 'development',
 });
 
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   
@@ -19,5 +18,4 @@ const nextConfig = {
   },
 };
 
-// هنا بيتم دمج الـ PWA مع إعدادات Next
 export default withSerwist(nextConfig);

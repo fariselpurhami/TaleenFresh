@@ -1,4 +1,5 @@
 // src/app/(admin)/admin/page.tsx
+
 'use client'; 
 
 import { useState, useEffect } from 'react';
@@ -15,7 +16,7 @@ export default function AdminDashboardPage() {
 
  useEffect(() => {
    async function fetchData() {
-     // لا نحتاج لجلب الطلبات هنا، الـ Provider في layout.tsx يقوم بذلك!
+    
      const { data: p } = await supabase.from('products').select('*').order('name_en');
      setProducts(p || []);
      setLoading(false);
@@ -26,10 +27,8 @@ export default function AdminDashboardPage() {
  if (loading) return <div className="flex h-screen items-center justify-center font-black text-gray-400" dir="rtl">جاري تحميل غرفة العمليات...</div>;
 
  return (
-   // حاوية قوية وواضحة جداً بدون تعقيدات زائدة
    <div className="w-full max-w-4xl mx-auto flex flex-col pb-[calc(5rem+env(safe-area-inset-bottom))] px-[calc(1rem+env(safe-area-inset-left))]" dir="rtl">
     
-     {/* الهيدر والأزرار */}
      <header className="sticky top-0 z-50 bg-gray-50 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-4 flex flex-col gap-4 w-full">
        <h1 className="text-3xl font-black text-gray-900 px-2">غرفة العمليات</h1>
       
@@ -51,7 +50,6 @@ export default function AdminDashboardPage() {
        </div>
      </header>
 
-     {/* المحتوى - Flow Layout طبيعي جداً بدون Absolute */}
      <main className="w-full pt-2">
        <AnimatePresence mode="wait">
          {activeTab === 'orders' ? (

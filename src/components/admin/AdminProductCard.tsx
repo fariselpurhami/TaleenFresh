@@ -26,7 +26,6 @@ export function AdminProductCard({ product }: { product: any }) {
   return (
     <div className={`relative flex items-center bg-white/95 backdrop-blur-xl rounded-[1.75rem] p-3 shadow-[0_10px_40px_rgb(0,0,0,0.04)] border border-gray-100/50 mb-2 transition-all duration-500 ${!isAvailable && 'bg-gray-50/50 grayscale-[0.2]'}`} dir="rtl">
 
-      {/* 1. البلوك الأيمن: أزرار التحكم (ترتيب سيليكون فالي وعرض ثابت لمنع الزحزحة) */}
       <div className="flex items-center gap-2 shrink-0">
         <button 
           onClick={handleUpdate}
@@ -36,7 +35,6 @@ export function AdminProductCard({ product }: { product: any }) {
           {isSaving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={20} />}
         </button>
 
-        {/* حقل السعر (محمي ضد الـ Zoom-in في الآيفون بحجم خط 16px) */}
         <div className="bg-gray-100/80 rounded-2xl px-2 h-12 flex items-center border border-transparent focus-within:border-[#22c55e] focus-within:bg-white w-[5.5rem] transition-all duration-300">
           <span className="text-[10px] font-black text-gray-400 ml-1">ج.م</span>
           <input 
@@ -56,14 +54,12 @@ export function AdminProductCard({ product }: { product: any }) {
         </button>
       </div>
 
-      {/* 2. البلوك الأوسط: مساحة الاسم (flex-1 بتضمن إن كل الأسماء تبدأ من نفس الخط بالمسطرة) */}
       <div className="flex-1 flex flex-col items-start justify-center pr-4 pl-2 overflow-hidden">
         <h3 className="font-black text-gray-900 text-sm md:text-base mb-1 truncate w-full text-right leading-tight">
           {product.name_ar || product.name_en}
         </h3>
       </div>
 
-      {/* 3. البلوك الأيسر: الصورة (متثبتة على أقصى الشمال) */}
       <div className="relative w-14 h-14 bg-gradient-to-br from-gray-50 to-white rounded-[1.25rem] p-1.5 shrink-0 shadow-inner flex items-center justify-center border border-gray-100/50">
         <img src={product.image_url} alt="" className="w-full h-full object-contain drop-shadow-sm" />
         {!isAvailable && <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] rounded-[1.25rem]" />}

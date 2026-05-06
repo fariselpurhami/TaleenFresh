@@ -28,7 +28,6 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
   const { getTotalItems } = useCart();
   const totalItems = getTotalItems();
   
-  // 1. محرك الحركة للسلة (Cart Animation Controller)
   const cartControls = useAnimation();
 
   useEffect(() => {
@@ -37,17 +36,15 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
     setGreeting(hour < 12 ? 'صباح الخير ☀️' : 'مساء الخير 🌙');
     setLiveProducts(initialProducts);
 
-    // 2. مستمع الأحداث: عندما ينادي كارت المنتج (أضف للسلة)، ترقص السلة هنا
     const handleCartBounce = () => {
       cartControls.start({
         scale: [1, 1.2, 0.9, 1.1, 1],
-        y: [0, -8, 4, -2, 0], // قفزة خفيفة للأعلى
+        y: [0, -8, 4, -2, 0], 
         transition: { duration: 0.4, type: "spring", stiffness: 300 }
       });
     };
     window.addEventListener('cart-bounce', handleCartBounce);
 
-    // الرادار الحي لـ Supabase
     const channel = supabase
       .channel('realtime-storefront')
       .on(
@@ -103,7 +100,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
         <h1 className="text-2xl font-black leading-tight text-foreground mb-1 text-right">
           مُنتجات طازجة تُقطف بعناية<br />لتصلك بأعلى جودة.
         </h1>
-        {/* تم إضافة مواعيد العمل هنا */}
+      
         <p className="text-sm text-muted-foreground mt-2 font-medium text-right bg-white/50 inline-block px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm backdrop-blur-sm">
           ننتقي أفضلَ المنتجاتِ يوميًّا 🍃 | مُتوفِّرون لخدمتكُم داخلَ مدينةِ كفر الشيخ من 8:00 ص حتَّى 10:00 م.
         </p>
@@ -190,7 +187,6 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
         )}
       </div>
 
-      {/* Floating Bottom Navigation Bar */}
       <div className="fixed bottom-1 left-0 right-0 z-40 mx-auto px-10 w-full max-w-md">
         <div className="flex h-20 items-center justify-between rounded-[2.5rem] bg-white px-8 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100/80 backdrop-blur-md bg-white/90">
           <button className="flex flex-col items-center gap-1 text-[#2C643E]">
@@ -204,11 +200,10 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
             </button>
           </div>
 
-          {/* 3. The Animated Cart Button */}
           <motion.button
             onClick={() => window.dispatchEvent(new CustomEvent('open-cart'))}
             className="flex flex-col items-center gap-1 text-[#2C643E] relative"
-            animate={cartControls} // ربط الحركة بالزر
+            animate={cartControls} 
           >
             <div className="relative">
               <ShoppingCart size={24} strokeWidth={2.5} className="text-[#2C643E]" />

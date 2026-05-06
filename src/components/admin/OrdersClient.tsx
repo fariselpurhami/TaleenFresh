@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useAdminOrders } from '@/providers/AdminOrdersProvider'; // الـ Provider الجديد
-import { useHaptics } from '@/hooks/useHaptics'; // إضافة محرك الاهتزاز
+import { useAdminOrders } from '@/providers/AdminOrdersProvider'; 
+import { useHaptics } from '@/hooks/useHaptics'; 
 import { Phone, Clock, MapPin, ShoppingBag, User, Truck, Inbox, PackageCheck, ArchiveRestore } from 'lucide-react';
 
 import {
@@ -36,11 +36,9 @@ const formatCivilianTime = (dateString: string) => {
 };
 
 export default function OrdersClient() {
-  // الاعتماد المعماري على المصدر المركزي (Single Source of Truth)
+ 
   const { orders, updateOrderStatus } = useAdminOrders();
   const [activeTab, setActiveTab] = useState<'pending' | 'processing' | 'archived'>('pending');
-  
-  // تهيئة الاهتزاز
   const { trigger } = useHaptics();
 
   const { filteredOrders, pendingCount, processingCount } = useMemo(() => {
@@ -61,7 +59,6 @@ export default function OrdersClient() {
 
   return (
     <div className="w-full space-y-6 relative" dir="rtl">
-      {/* 1. لوحة التحكم المرجعية (Segmented Control - Sticky & Glassy) */}
       <div className="sticky top-4 z-40 bg-gray-100/80 backdrop-blur-xl p-1.5 rounded-2xl flex gap-1.5 shadow-sm border border-white/50">
         <button
           onClick={() => setActiveTab('pending')}
@@ -101,7 +98,6 @@ export default function OrdersClient() {
         </button>
       </div>
 
-      {/* 2. عرض الكروت بشبكة ذكية (Smart Grid System) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredOrders.length === 0 ? (
           <div className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
@@ -174,12 +170,11 @@ export default function OrdersClient() {
                   </div>
                 </div>
 
-                {/* --- تم التحديث هنا فقط (الفوتر الخاص بالـ Select) --- */}
                 <div className="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between mt-auto">
                   <Select 
                     value={order.status} 
                     onValueChange={(val) => {
-                      trigger('light'); // تشغيل الاهتزاز عند تغيير الحالة
+                      trigger('light'); 
                       updateOrderStatus(order.id, val);
                     }}
                   >
@@ -205,8 +200,7 @@ export default function OrdersClient() {
                     <p className="font-black text-xl text-green-700 font-mono">{order.total_price.toFixed(0)} ج.م</p>
                   </div>
                 </div>
-                {/* ----------------------------------------------------- */}
-                
+              
               </div>
             );
           })

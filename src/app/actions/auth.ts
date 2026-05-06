@@ -1,4 +1,5 @@
 // src/app/actions/auth.ts
+
 'use server';
 
 import { cookies } from 'next/headers';
@@ -8,7 +9,6 @@ export async function verifyAdminPin(formData: FormData) {
   const SECRET_PIN = process.env.ADMIN_SECRET_PIN;
   const SECRET_TOKEN = process.env.ADMIN_SECRET_TOKEN;
 
-  // Architectural Rule: Fail Fast if Env variables are missing
   if (!SECRET_PIN || !SECRET_TOKEN) {
     console.error('[CRITICAL ERROR] Missing Admin Environment Variables.');
     throw new Error('Server Configuration Error: Security credentials not set.');
@@ -18,12 +18,12 @@ export async function verifyAdminPin(formData: FormData) {
     const cookieStore = await cookies();
     cookieStore.set({
       name: 'taleen_admin_token',
-      value: SECRET_TOKEN, // Dynamic & Secure Token
+      value: SECRET_TOKEN, 
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 2592000, // 30 Days
+      maxAge: 2592000, 
     });
 
     return { success: true };

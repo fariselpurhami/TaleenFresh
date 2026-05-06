@@ -1,11 +1,12 @@
 // src/app/(auth)/admin-login/page.tsx
+
 'use client';
 
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, ShieldAlert, LockKeyhole, Cpu } from 'lucide-react';
 import { verifyAdminPin } from '@/app/actions/auth';
-import { motion, AnimatePresence } from 'framer-motion'; // التأكد من تثبيت framer-motion
+import { motion, AnimatePresence } from 'framer-motion'; 
 
 export default function AdminLogin() {
   const [pin, setPin] = useState('');
@@ -26,7 +27,6 @@ export default function AdminLogin() {
       if (result?.error) {
         setError(true);
         setPin(''); 
-        // تركيز تلقائي بعد الخطأ لراحة المدير
         setTimeout(() => {
             setError(false);
             inputRef.current?.focus();
@@ -38,7 +38,6 @@ export default function AdminLogin() {
     });
   };
 
-  // الدخول التلقائي الذكي
   useEffect(() => {
     if (pin.length === 4) {
       executeLogin();
@@ -53,7 +52,6 @@ export default function AdminLogin() {
   return (
     <main dir="rtl" className="min-h-[100dvh] bg-[#0A0F0D] flex items-center justify-center p-5 relative overflow-hidden font-sans selection:bg-[#22c55e]/30 selection:text-white">
       
-      {/* 1. الجسيمات المضيئة في الخلفية (Ambient Glowing Orbs) */}
       <motion.div 
         animate={{ 
             scale: [1, 1.1, 1],
@@ -73,7 +71,6 @@ export default function AdminLogin() {
         className="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] max-w-[500px] max-h-[500px] bg-gradient-to-tr from-[#16a34a]/20 to-emerald-900/10 blur-[100px] rounded-full pointer-events-none" 
       />
 
-      {/* 2. البطاقة الزجاجية المركزية (The Glassmorphism Core) */}
       <motion.div 
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -81,10 +78,8 @@ export default function AdminLogin() {
         className="w-full max-w-[420px] bg-white/5 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-white/10 overflow-hidden relative z-10 before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/10 before:to-transparent before:pointer-events-none"
       >
         
-        {/* شريط زينة علوي (Premium Accent Line) */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#22c55e] to-transparent opacity-70" />
 
-        {/* الهيدر (Header) */}
         <div className="pt-14 pb-8 px-8 text-center flex flex-col items-center relative z-10">
           <motion.div 
             initial={{ scale: 0 }} 
@@ -107,7 +102,6 @@ export default function AdminLogin() {
           </div>
         </div>
 
-        {/* نموذج الإدخال (Form) */}
         <form onSubmit={handleLogin} className="px-8 pb-12 relative z-10">
           <div className="space-y-6">
             <div className="relative flex flex-col items-center">
@@ -136,11 +130,9 @@ export default function AdminLogin() {
                   autoFocus
                 />
                 
-                {/* تأثير توهج خلف الـ Input */}
                 <div className={`absolute -inset-1 bg-gradient-to-r from-[#22c55e] to-emerald-400 rounded-[1.7rem] blur opacity-0 group-focus-within:opacity-20 transition duration-500 -z-10 ${error ? 'hidden' : 'block'}`} />
               </div>
 
-              {/* إشعار الخطأ بحركة أنيقة */}
               <AnimatePresence>
                 {error && (
                   <motion.div 
@@ -156,7 +148,6 @@ export default function AdminLogin() {
               </AnimatePresence>
             </div>
 
-            {/* الزر الرئيسي (The Action Button) */}
             <motion.button
               type="submit"
               disabled={isPending || pin.length !== 4}
@@ -179,7 +170,6 @@ export default function AdminLogin() {
                 )}
               </span>
               
-              {/* لمعة تتحرك فوق الزر (Shine Effect) */}
               {pin.length === 4 && !isPending && (
                 <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
               )}

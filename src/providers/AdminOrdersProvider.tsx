@@ -17,13 +17,11 @@ export function AdminOrdersProvider({ children, initialOrders }: { children: Rea
   const [orders, setOrders] = useState(initialOrders);
   const [newOrder, setNewOrder] = useState<any | null>(null);
   
-  // Architectural Fix: Single Audio Instance (No Memory Leaks)
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     audioRef.current = new Audio('/notification.mp3');
     
-    // اتصال WebSocket واحد فقط للوحة التحكم بأكملها
     const channel = supabase
       .channel('admin-global-orders')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
@@ -31,7 +29,6 @@ export function AdminOrdersProvider({ children, initialOrders }: { children: Rea
         setOrders((current) => [insertedOrder, ...current]);
         setNewOrder(insertedOrder);
         
-        // التشغيل الآمن للصوت
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(e => console.warn('Audio blocked by browser:', e));
@@ -49,14 +46,14 @@ export function AdminOrdersProvider({ children, initialOrders }: { children: Rea
   }, []);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    // Optimistic Update with Rollback security
+
     const prevOrders = [...orders];
     setOrders((current) => current.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
     
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (error) {
       console.error('Failed to update status:', error);
-      setOrders(prevOrders); // Rollback on failure
+      setOrders(prevOrders); 
     }
   };
 

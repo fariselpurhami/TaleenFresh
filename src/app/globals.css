@@ -51,7 +51,6 @@
   --font-sans: var(--font-sans);
   --font-heading: var(--font-sans);
 
-  /* حركات الـ Animations الاحترافية للقوائم */
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 
@@ -65,8 +64,6 @@
   }
 }
 
-/* تحديد درجات الألوان (OKLCH) فائقة الدقة 
-*/
 @layer base {
   :root {
     --background: oklch(1 0 0);
@@ -131,8 +128,6 @@
   }
 }
 
-/* قواعد الأساسيات والخطوط 
-*/
 @layer base {
   * {
     @apply border-border outline-ring;
@@ -142,8 +137,6 @@
   }
 }
 
-/* أدوات الواجهة المخصصة (إخفاء شريط التمرير بذكاء) 
-*/
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
@@ -163,7 +156,6 @@
     scrollbar-width: none;
   }
 
-  /* --- الكود المحدث لحل مشكلة الطبقات --- */
   .bg-pattern-watermark {
     position: relative;
     isolation: isolate;
@@ -180,4 +172,4 @@
     opacity: 0.08; 
     pointer-events: none; 
   }
-} /* <-- القوس ده هو اللي كان عامل المشكلة كلها */
+} 

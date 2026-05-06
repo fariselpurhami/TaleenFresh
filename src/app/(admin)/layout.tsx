@@ -1,4 +1,5 @@
 // src/app/admin/layout.tsx
+
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { AdminOrdersProvider } from '@/providers/AdminOrdersProvider';
@@ -28,7 +29,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
  return (
    <AdminOrdersProvider initialOrders={initialOrders || []}>
      <OrderRadar />
-     {/* التأكد من إضافة dir="rtl" هنا لدعم الواجهة العربية من الأساس */}
      <div className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
        {children}
      </div>

@@ -1,3 +1,5 @@
+// src/app/(customer)/layout.tsx 
+
 import type { Metadata, Viewport } from 'next';
 import { Inter, Noto_Kufi_Arabic } from 'next/font/google';
 import { cn } from '@/lib/utils';
@@ -48,7 +50,6 @@ export default function CustomerLayout({ children }: { readonly children: React.
           '[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]'
         )}>
           
-          {/* 👇 الحل القاطع: ديف حقيقي للعلامة المائية */}
           <div 
             className="pointer-events-none absolute inset-0 z-0"
             style={{
@@ -62,7 +63,6 @@ export default function CustomerLayout({ children }: { readonly children: React.
 
           <div className="fixed top-0 left-0 w-full z-[100] h-[max(env(safe-area-inset-top),1.25rem)] bg-[#f8f9fa]/85 backdrop-blur-md pointer-events-none md:hidden" />
 
-          {/* 👇 رفعنا الموقع نفسه فوق العلامة المائية */}
           <div className="relative z-10 flex flex-col flex-1 h-full">
             {children}
           </div>

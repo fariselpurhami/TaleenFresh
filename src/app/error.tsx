@@ -1,4 +1,5 @@
 // src/app/error.tsx
+
 'use client';
 
 import { useEffect } from 'react';
@@ -13,8 +14,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // المستوى المعماري العالي: هنا يتم ربط أداة المراقبة (مثل Sentry)
-    // Sentry.captureException(error);
+   
     console.error(`[System Error Log] Digest: ${error.digest || 'N/A'}`, error);
   }, [error]);
 

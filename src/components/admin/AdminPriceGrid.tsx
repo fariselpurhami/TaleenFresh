@@ -1,4 +1,5 @@
 // src/components/admin/AdminPriceGrid.tsx
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -15,7 +16,7 @@ interface AdminProduct {
 
 export function AdminPriceGrid({ initialData }: { initialData: AdminProduct[] }) {
   const [products, setProducts] = useState(initialData);
-  const [syncError, setSyncError] = useState<string | null>(null); // Error UI State
+  const [syncError, setSyncError] = useState<string | null>(null); 
 
   useEffect(() => {
     const channel = supabase
@@ -33,25 +34,22 @@ export function AdminPriceGrid({ initialData }: { initialData: AdminProduct[] })
   }, []);
 
   const updateProduct = async (id: string, updates: Partial<AdminProduct>) => {
-    // 1. Snapshot prior state for Rollback
+   
     const previousState = [...products];
     setSyncError(null);
 
-    // 2. Optimistic UI update
     setProducts((current) =>
       current.map((p) => (p.id === id ? { ...p, ...updates } : p))
     );
 
-    // 3. Persist to DB
     const { error } = await supabase
       .from('products')
       .update(updates)
       .eq('id', id);
 
-    // 4. Architect level: Rollback on failure
     if (error) {
       console.error("Update failed:", error);
-      setProducts(previousState); // Rollback immediately
+      setProducts(previousState); 
       setSyncError("فشل تحديث قاعدة البيانات. تم التراجع عن التعديل.");
       setTimeout(() => setSyncError(null), 4000);
     }
@@ -59,7 +57,6 @@ export function AdminPriceGrid({ initialData }: { initialData: AdminProduct[] })
 
   return (
     <div className="w-full relative">
-      {/* Inline Error Banner for Admin */}
       {syncError && (
         <div className="mb-4 bg-red-100 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2 font-bold text-sm shadow-sm border border-red-200 animate-in fade-in slide-in-from-top-2">
           <AlertCircle className="w-5 h-5" />

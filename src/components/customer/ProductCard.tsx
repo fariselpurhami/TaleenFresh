@@ -23,12 +23,10 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
   const handleAdd = () => {
     if (!isAvailable) return;
     
-    // إرسال حدث لتهتز السلة العائمة في Storefront
     window.dispatchEvent(new CustomEvent('cart-bounce'));
     
     addItem({ id, name, price });
     
-    // تأثير بصري رائع (Micro-interaction) لتأكيد الإضافة
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 800);
   };
@@ -41,12 +39,10 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
         !isAvailable ? 'opacity-50 grayscale' : ''
       }`}
     >
-      {/* خصم جذاب بتصميم iOS */}
       <div className="absolute top-0 left-0 bg-gradient-to-br from-[#2C643E] to-green-600 text-white text-[11px] font-black tracking-wide px-3.5 py-1.5 rounded-br-[1.2rem] rounded-tl-[1.5rem] z-10 shadow-sm">
         10% خصم
       </div>
 
-      {/* صورة المنتج مع مساحة بيضاء تبرز جمالها */}
       <div className="relative h-36 w-full mb-3 mt-4 flex items-center justify-center bg-transparent">
         <Image
           src={imageUrl}
@@ -58,14 +54,12 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
         />
       </div>
 
-      {/* معلومات المنتج والزر - هيكلة جديدة */}
       <div className="flex flex-col gap-2 mt-auto w-full">
-        {/* الاسم */}
+    
         <h3 className="font-bold text-gray-800 text-[15px] line-clamp-1 text-right w-full">
           {name}
         </h3>
         
-        {/* السعر مرتب بشكل فخم */}
         <div className="flex flex-col items-start w-full min-w-0">
           <div className="flex items-baseline flex-nowrap w-full text-right truncate">
             <span className="text-[#2C643E] font-black text-[17px] tracking-tight shrink-1">
@@ -78,7 +72,6 @@ export function ProductCard({ id, name, price, imageUrl, isAvailable, priority =
           </div>
         </div>
 
-        {/* زر "أضف للسلة" العالمي - iOS Style Pill Button */}
         <button
           onClick={handleAdd}
           disabled={!isAvailable}
