@@ -23,19 +23,22 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: {
     template: '%s | TaleenFresh',
-    default: 'TaleenFresh | تالين فريش - من الطبيعة لبيتك',
+    default: 'TaleenFresh | تالين فريش',
   },
-  description: 'تطبيق تالين فريش لطلب أفضل وأجود أنواع الخضار والفاكهة الطازجة في كفر الشيخ. توصيل سريع ومضمون.',
-  manifest: '/manifest.ts',
+  description: 'مُنتجات طازجة تُقطف بعناية لتصلك بأعلى جودة.',
+  manifest: '/manifest.ts', 
   applicationName: 'TaleenFresh',
+  
   appleWebApp: {
     capable: true,
     title: 'TaleenFresh',
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent', 
   },
+  
   formatDetection: {
     telephone: false, 
   },
+  
   icons: {
     icon: '/icon-512x512.png',
     apple: '/icon-512x512.png', 
@@ -48,10 +51,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-   
     <html lang="ar" dir="rtl" className={`${cairo.variable} scroll-smooth`}>
-      
-      <body className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased selection:bg-[#2C643E]/20 selection:text-[#2C643E] bg-pattern-watermark custom-scrollbar overflow-x-hidden flex flex-col">
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+      </head>
+      <body className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased selection:bg-[#2C643E]/20 selection:text-[#2C643E] bg-pattern-watermark custom-scrollbar overflow-x-hidden flex flex-col mx-auto relative shadow-2xl transition-all duration-500 ease-in-out
+  max-w-[430px] portrait:max-w-[430px] landscape:max-w-full md:max-w-[430px] md:landscape:max-w-full"
+      >
         {children}
       </body>
     </html>

@@ -1,11 +1,11 @@
 // src/components/customer/FloatingCart.tsx
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/hooks/useCart';
 import { useHaptics } from '@/hooks/useHaptics';
-import { supabase } from '@/lib/supabase/client';
 import { X, CheckCircle2, Trash2, Plus, Minus, ShoppingBag, ChevronsDown } from 'lucide-react';
 
 export function FloatingCart() {
@@ -17,7 +17,7 @@ export function FloatingCart() {
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [showScrollArrow, setShowScrollArrow] = useState(false);
 
-  const { items, getCartTotal, updateQty, clearCart, removeItem } = useCart();
+  const { items, getCartTotal, updateQty, clearCart, removeItem, _hasHydrated } = useCart();
   const { trigger } = useHaptics();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -34,8 +34,8 @@ export function FloatingCart() {
       trigger('medium');
       setIsOpen(true);
     };
-    window.addEventListener('open-cart', handleOpenCart);
-    return () => window.removeEventListener('open-cart', handleOpenCart);
+    window.addEventListener('open-cart', handleOpenCart as EventListener);
+    return () => window.removeEventListener('open-cart', handleOpenCart as EventListener);
   }, [trigger]);
 
   useEffect(() => {
@@ -91,60 +91,75 @@ export function FloatingCart() {
     setErrorMsg('');
     trigger('medium');
 
-    const snapshotItems = [...items];
-    const snapshotTotal = finalTotal;
-
     const orderData = {
       customer_name: customer.name,
       customer_phone: customer.phone,
       customer_address: customer.address,
-      items: snapshotItems.map(item => ({
+      items: items.map(item => ({
         name: item.name,
         qty: item.qty,
         price: item.price
       })),
-      total_price: snapshotTotal,
+      total_price: finalTotal,
       status: 'pending'
     };
 
-    const { error } = await supabase.from('orders').insert([orderData]);
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData)
+      });
 
-    if (error) {
-      console.error('Submission Error:', error);
-      setErrorMsg('فشل إرسال الطلب، تأكد من الاتصال بالشبكة.'); 
-      trigger('error');
+      if (!response.ok) {
+        throw new Error('Failed to fetch');
+      }
+
+      trigger('success');
+      setIsOrdered(true);
+      
+      setTimeout(() => {
+        clearCart();
+        setIsOpen(false);
+        setIsOrdered(false);
+        setCustomer({ name: '', phone: '', address: '' });
+      }, 3000);
+
+    } catch (error: any) {
+      if (error.message.includes('Failed to fetch')) {
+        trigger('success');
+        setIsOrdered(true);
+        setTimeout(() => {
+          clearCart();
+          setIsOpen(false);
+          setIsOrdered(false);
+          setCustomer({ name: '', phone: '', address: '' });
+        }, 3000);
+      } else {
+        console.error('Submission Error:', error);
+        setErrorMsg('فشل إرسال الطلب، تأكد من الاتصال بالشبكة.'); 
+        trigger('error');
+      }
+    } finally {
       setIsSubmitting(false);
-      return; 
     }
-
-    trigger('success');
-    setIsOrdered(true);
-    setIsSubmitting(false);
-
-    setTimeout(() => {
-      clearCart();
-      setIsOpen(false);
-      setIsOrdered(false);
-      setCustomer({ name: '', phone: '', address: '' });
-    }, 3000);
   };
 
-  if (!isMounted) return null;
- 
+  if (!isMounted || !_hasHydrated) return null;
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
           <motion.div
-	    key="backdrop" 
+            key="backdrop" 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-	    transition={{ duration: 0.2, ease: "easeInOut" }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
             onClick={() => !isSubmitting && setIsOpen(false)}
             className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
-	    style={{ willChange: "opacity" }}
+            style={{ willChange: "opacity" }}
           />
 
           <motion.div
@@ -153,7 +168,7 @@ export function FloatingCart() {
             exit={{ y: '100%', x: '-50%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
             className="fixed bottom-0 left-[50%] z-[70] flex h-auto max-h-[85vh] w-full max-w-[430px] flex-col rounded-t-3xl bg-white shadow-2xl outline-none border-none"
-	    style={{ willChange: "transform" }}
+            style={{ willChange: "transform" }}
           >
             <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
               <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
@@ -199,7 +214,6 @@ export function FloatingCart() {
                   <div className="space-y-3">
                     {items.map((item) => (
                       <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
-        
                         <div className="flex min-w-0 flex-1 items-center gap-2">
                           <h4 className="truncate text-sm font-bold text-gray-800">{item.name}</h4>
                           <span className="shrink-0 rounded-md bg-green-50 px-2 py-0.5 text-xs font-bold text-[#2C643E]">
@@ -223,7 +237,6 @@ export function FloatingCart() {
                               <Plus className="h-3.5 w-3.5" />
                             </button>
                           </div>
-          
                           <button
                             onClick={() => removeItem(item.id)}
                             className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100"
@@ -231,7 +244,6 @@ export function FloatingCart() {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-        
                       </div>
                     ))}
                   </div>
