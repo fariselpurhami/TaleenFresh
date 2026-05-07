@@ -91,6 +91,9 @@ export function FloatingCart() {
     setErrorMsg('');
     trigger('medium');
 
+    const snapshotItems = [...items];
+    const snapshotTotal = finalTotal;
+
     const orderData = {
       customer_name: customer.name,
       customer_phone: customer.phone,
@@ -104,46 +107,42 @@ export function FloatingCart() {
       status: 'pending'
     };
 
-    try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData)
-      });
+    const { error } = await supabase.from('orders').insert([orderData]);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch');
-      }
-
+  if (error) {
+    if (!navigator.onLine || error.message.includes('Failed to fetch')) {
       trigger('success');
       setIsOrdered(true);
-      
+      setIsSubmitting(false);
+
       setTimeout(() => {
         clearCart();
         setIsOpen(false);
         setIsOrdered(false);
         setCustomer({ name: '', phone: '', address: '' });
       }, 3000);
-
-    } catch (error: any) {
-      if (error.message.includes('Failed to fetch')) {
-        trigger('success');
-        setIsOrdered(true);
-        setTimeout(() => {
-          clearCart();
-          setIsOpen(false);
-          setIsOrdered(false);
-          setCustomer({ name: '', phone: '', address: '' });
-        }, 3000);
-      } else {
-        console.error('Submission Error:', error);
-        setErrorMsg('فشل إرسال الطلب، تأكد من الاتصال بالشبكة.'); 
-        trigger('error');
-      }
-    } finally {
-      setIsSubmitting(false);
+      return;
     }
-  };
+
+    console.error('Submission Error:', error);
+    setErrorMsg('فشل إرسال الطلب، الرجاء المحاولة مرة أخرى.');
+    trigger('error');
+    setIsSubmitting(false);
+    return;
+  }
+
+  trigger('success');
+  setIsOrdered(true);
+  setIsSubmitting(false);
+
+  setTimeout(() => {
+    clearCart();
+    setIsOpen(false);
+    setIsOrdered(false);
+    setCustomer({ name: '', phone: '', address: '' });
+  }, 3000);
+};
+
 
   if (!isMounted || !_hasHydrated) return null;
 
