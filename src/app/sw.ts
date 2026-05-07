@@ -2,13 +2,13 @@
 
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import {
-  Serwist,
-  StaleWhileRevalidate,
-  NetworkOnly,
-  ExpirationPlugin,
+import { 
+  Serwist, 
+  StaleWhileRevalidate, 
+  NetworkOnly, 
+  ExpirationPlugin, 
   BackgroundSyncPlugin,
-  CacheFirst
+  CacheFirst 
 } from "serwist";
 
 declare global {
@@ -20,7 +20,21 @@ declare global {
 declare const self: WorkerGlobalScope & typeof globalThis;
 
 const bgSyncPlugin = new BackgroundSyncPlugin('taleenfresh-orders-queue', {
-  maxRetentionTime: 48 * 60,
+  maxRetentionTime: 48 * 60, 
+  onSync: async ({ queue }) => {
+    console.log('[Service Worker] Network is back! Replaying orders queue...');
+    let entry;
+    while ((entry = await queue.shiftRequest())) {
+      try {
+        await fetch(entry.request);
+        console.log('[Service Worker] Offline order sent successfully!');
+      } catch (error) {
+        console.error('[Service Worker] Failed to replay order, putting it back in queue.', error);
+        await queue.unshiftRequest(entry);
+        throw error;
+      }
+    }
+  },
 });
 
 const serwist = new Serwist({
@@ -34,10 +48,7 @@ const serwist = new Serwist({
       handler: new StaleWhileRevalidate({
         cacheName: 'products-data-cache-v1',
         plugins: [
-          new ExpirationPlugin({
-            maxEntries: 100,
-            maxAgeSeconds: 24 * 60 * 60,
-          }),
+          new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 24 * 60 * 60 }),
         ],
       }),
     },
@@ -52,10 +63,7 @@ const serwist = new Serwist({
       handler: new CacheFirst({
         cacheName: 'supabase-images-cache-v1',
         plugins: [
-          new ExpirationPlugin({
-            maxEntries: 300,
-            maxAgeSeconds: 7 * 24 * 60 * 60,
-          }),
+          new ExpirationPlugin({ maxEntries: 300, maxAgeSeconds: 7 * 24 * 60 * 60 }),
         ],
       }),
     },

@@ -14,7 +14,7 @@ export function FloatingCart() {
   const [isMounted, setIsMounted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOrdered, setIsOrdered] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(''); 
+  const [errorMsg, setErrorMsg] = useState('');
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [showScrollArrow, setShowScrollArrow] = useState(false);
 
@@ -28,6 +28,37 @@ export function FloatingCart() {
   const DELIVERY_FEE = 25;
   const finalTotal = cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0;
   const isFormIncomplete = !customer.name || !customer.phone || !customer.address;
+
+  const processOfflineQueue = async () => {
+    if (!navigator.onLine) return;
+    const queueStr = localStorage.getItem('offline_orders');
+    if (!queueStr) return;
+
+    try {
+      const queue = JSON.parse(queueStr);
+      if (!Array.isArray(queue) || queue.length === 0) return;
+
+      const { error } = await supabase.from('orders').insert(queue);
+      if (!error) {
+        localStorage.removeItem('offline_orders');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    processOfflineQueue();
+    const triggerSync = () => requestAnimationFrame(processOfflineQueue);
+    window.addEventListener('online', triggerSync);
+    window.addEventListener('visibilitychange', triggerSync);
+    window.addEventListener('focus', triggerSync);
+    return () => {
+      window.removeEventListener('online', triggerSync);
+      window.removeEventListener('visibilitychange', triggerSync);
+      window.removeEventListener('focus', triggerSync);
+    };
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -44,7 +75,7 @@ export function FloatingCart() {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
-      setErrorMsg(''); 
+      setErrorMsg('');
     }
     return () => {
       document.body.style.overflow = '';
@@ -73,14 +104,14 @@ export function FloatingCart() {
   useEffect(() => {
     const textarea = addressRef.current;
     if (textarea) {
-      textarea.style.height = 'auto'; 
-      textarea.style.height = `${textarea.scrollHeight}px`; 
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [customer.address]);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0 || isSubmitting) return; 
+    if (items.length === 0 || isSubmitting) return;
 
     if (isFormIncomplete) {
       trigger('medium');
@@ -91,9 +122,6 @@ export function FloatingCart() {
     setIsSubmitting(true);
     setErrorMsg('');
     trigger('medium');
-
-    const snapshotItems = [...items];
-    const snapshotTotal = finalTotal;
 
     const orderData = {
       customer_name: customer.name,
@@ -109,21 +137,37 @@ export function FloatingCart() {
     };
 
     if (!navigator.onLine) {
+      const existingStr = localStorage.getItem('offline_orders');
+      const existingQueue = existingStr ? JSON.parse(existingStr) : [];
+      existingQueue.push(orderData);
+      localStorage.setItem('offline_orders', JSON.stringify(existingQueue));
+
+      trigger('success');
+      setIsOrdered(true);
+      setIsSubmitting(false);
+
+      setTimeout(() => {
+        clearCart();
+        setIsOpen(false);
+        setIsOrdered(false);
+        setCustomer({ name: '', phone: '', address: '' });
+      }, 3000);
+      return;
+    }
+
     try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/orders`,
-        {
-          method: 'POST',
-          headers: {
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(orderData)
-        }
-      );
-    } catch (err) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+      const { error } = await supabase.from('orders').insert([orderData]).abortSignal(controller.signal);
+      clearTimeout(timeoutId);
+
+      if (error) throw error;
+    } catch (err: any) {
+      const existingStr = localStorage.getItem('offline_orders');
+      const existingQueue = existingStr ? JSON.parse(existingStr) : [];
+      existingQueue.push(orderData);
+      localStorage.setItem('offline_orders', JSON.stringify(existingQueue));
     }
 
     trigger('success');
@@ -136,30 +180,7 @@ export function FloatingCart() {
       setIsOrdered(false);
       setCustomer({ name: '', phone: '', address: '' });
     }, 3000);
-    return;
-  }
-
-  const { error } = await supabase.from('orders').insert([orderData]);
-
-  if (error) {
-    console.error('Submission Error:', error);
-    setErrorMsg('فشل إرسال الطلب، الرجاء المحاولة مرة أخرى.');
-    trigger('error');
-    setIsSubmitting(false);
-    return;
-  }
-
-  trigger('success');
-  setIsOrdered(true);
-  setIsSubmitting(false);
-
-  setTimeout(() => {
-    clearCart();
-    setIsOpen(false);
-    setIsOrdered(false);
-    setCustomer({ name: '', phone: '', address: '' });
-  }, 3000);
-};
+  };
 
   if (!isMounted || !_hasHydrated) return null;
 
@@ -168,7 +189,7 @@ export function FloatingCart() {
       {isOpen && (
         <>
           <motion.div
-            key="backdrop" 
+            key="backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -236,7 +257,7 @@ export function FloatingCart() {
                             {(item.price * item.qty).toFixed(2)} ج.م
                           </span>
                         </div>
-        
+
                         <div className="flex shrink-0 items-center gap-2" dir="ltr">
                           <div className="flex items-center gap-1 rounded-lg border bg-gray-50 p-0.5">
                             <button
@@ -270,7 +291,7 @@ export function FloatingCart() {
                         {errorMsg}
                       </div>
                     )}
-                    
+
                     <h3 className="w-full text-center text-lg font-bold text-gray-800">
                       الرجاء إدخال بياناتك
                     </h3>
@@ -349,7 +370,7 @@ export function FloatingCart() {
                 </button>
               </div>
             )}
-            
+
             <div className="absolute top-[calc(100%-2px)] left-0 right-0 h-[100px] bg-white pointer-events-none" />
           </motion.div>
         </>
