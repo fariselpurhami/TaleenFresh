@@ -15,6 +15,7 @@ const withSerwist = withSerwistInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ['192.168.1.5'],
   images: {
     
     formats: ['image/avif', 'image/webp'],
@@ -29,9 +30,7 @@ const nextConfig = {
 };
 
 export default withSentryConfig(withSerwist(nextConfig), {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
-
+ 
   org: "taleenfresh",
 
   project: "javascript-nextjs",
