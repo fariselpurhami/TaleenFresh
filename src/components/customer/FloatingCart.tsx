@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/hooks/useCart';
 import { useHaptics } from '@/hooks/useHaptics';
 import { X, CheckCircle2, Trash2, Plus, Minus, ShoppingBag, ChevronsDown } from 'lucide-react';
+import { supabase } from '@/lib/supabase/client';
 
 export function FloatingCart() {
   const [isOpen, setIsOpen] = useState(false);
