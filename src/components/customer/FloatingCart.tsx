@@ -108,23 +108,40 @@ export function FloatingCart() {
       status: 'pending'
     };
 
-    const { error } = await supabase.from('orders').insert([orderData]);
-
-  if (error) {
-    if (!navigator.onLine || error.message.includes('Failed to fetch')) {
-      trigger('success');
-      setIsOrdered(true);
-      setIsSubmitting(false);
-
-      setTimeout(() => {
-        clearCart();
-        setIsOpen(false);
-        setIsOrdered(false);
-        setCustomer({ name: '', phone: '', address: '' });
-      }, 3000);
-      return;
+    if (!navigator.onLine) {
+    try {
+      await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/orders`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(orderData)
+        }
+      );
+    } catch (err) {
     }
 
+    trigger('success');
+    setIsOrdered(true);
+    setIsSubmitting(false);
+
+    setTimeout(() => {
+      clearCart();
+      setIsOpen(false);
+      setIsOrdered(false);
+      setCustomer({ name: '', phone: '', address: '' });
+    }, 3000);
+    return;
+  }
+
+  const { error } = await supabase.from('orders').insert([orderData]);
+
+  if (error) {
     console.error('Submission Error:', error);
     setErrorMsg('فشل إرسال الطلب، الرجاء المحاولة مرة أخرى.');
     trigger('error');
@@ -143,7 +160,6 @@ export function FloatingCart() {
     setCustomer({ name: '', phone: '', address: '' });
   }, 3000);
 };
-
 
   if (!isMounted || !_hasHydrated) return null;
 
