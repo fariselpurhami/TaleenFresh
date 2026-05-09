@@ -1,3 +1,5 @@
+// src/components/customer/FloatingCart.tsx
+
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -204,7 +206,7 @@ export function FloatingCart() {
       customer_name: customer.name,
       customer_phone: customer.phone,
       customer_address: customer.address,
-      items: items.map(item => ({
+      items: items.map((item) => ({
         name: item.name,
         qty: item.qty,
         price: item.price
@@ -219,7 +221,6 @@ export function FloatingCart() {
         await handleCardCheckout(orderData)
         return
       }
-
       await handleCodCheckout(orderData)
     } catch (err: any) {
       setErrorMsg(err?.message || 'حدث خطأ غير متوقع أثناء تنفيذ العملية')
@@ -249,7 +250,7 @@ export function FloatingCart() {
             animate={{ y: 0, x: '-50%' }}
             exit={{ y: '100%', x: '-50%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
-            className="fixed bottom-0 left-[50%] z-[70] flex h-auto max-h-[90vh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none border-none"
+            className="fixed bottom-0 left-[50%] z-[70] flex h-auto w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none sm:max-h-[80vh] max-h-[90vh]"
           >
             <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-6 py-4">
               <div className="flex items-center gap-2 text-xl font-bold text-gray-800">
@@ -295,7 +296,7 @@ export function FloatingCart() {
                 <div
                   ref={scrollContainerRef}
                   onScroll={checkScrollState}
-                  className="relative flex-1 overflow-y-auto px-6 pt-4 pb-12 custom-scrollbar"
+                  className="custom-scrollbar relative flex-1 overflow-y-auto px-6 pb-12 pt-4"
                 >
                   {isOrdered ? (
                     <div className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
@@ -320,43 +321,50 @@ export function FloatingCart() {
                   ) : (
                     <>
                       <div className="space-y-3">
-                        {items.map(item => (
-                          <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                              <h4 className="truncate text-sm font-bold text-gray-800">{item.name}</h4>
-                              <span className="shrink-0 rounded-md bg-green-50 px-2 py-0.5 text-xs font-bold text-[#2C643E]">
-                                {(item.price * item.qty).toFixed(2)} ج.م
-                              </span>
-                            </div>
+                        {items.map((item) => {
+                          const isGrapeLeaves = item.name.includes('عنب')
+                          const unit = (item as any).category === 'leaf_greens' && !isGrapeLeaves ? 'حزمة' : 'كجم'
+			  const step = unit === 'حزمة' ? 1 : 0.5;
+                          const minQty = unit === 'حزمة' ? 1 : 0.5;
 
-                            <div className="flex shrink-0 items-center gap-2" dir="ltr">
-                              <div className="flex items-center gap-1 rounded-lg border bg-gray-50 p-0.5">
-                                <button
-                                  onClick={() => updateQty(item.id, Math.max(0.5, item.qty - 0.5))}
-                                  className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-gray-200"
-                                >
-                                  <Minus className="h-3.5 w-3.5" />
-                                </button>
-                                <span className="w-12 text-center text-sm font-bold text-gray-700">
-                                  {item.qty} كجم
+                          return (
+                            <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
+                              <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <h4 className="truncate text-sm font-bold text-gray-800">{item.name}</h4>
+                                <span className="shrink-0 rounded-md bg-green-50 px-2 py-0.5 text-xs font-bold text-[#2C643E]">
+                                  {(item.price * item.qty).toFixed(2)} ج.م
                                 </span>
-                                <button
-                                  onClick={() => updateQty(item.id, item.qty + 0.5)}
-                                  className="rounded-md bg-white p-1.5 text-[#2C643E] shadow-sm transition-colors hover:bg-green-50"
-                                >
-                                  <Plus className="h-3.5 w-3.5" />
-                                </button>
                               </div>
 
-                              <button
-                                onClick={() => removeItem(item.id)}
-                                className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              <div className="flex shrink-0 items-center gap-2" dir="ltr">
+                                <div className="flex items-center gap-1 rounded-lg border bg-gray-50 p-0.5">
+                                  <button
+                                    onClick={() => updateQty(item.id, Math.max(minQty, item.qty - step))}
+                                    className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-gray-200"
+                                  >
+                                    <Minus className="h-3.5 w-3.5" />
+                                  </button>
+                                  <span className="w-14 text-center text-sm font-bold text-gray-700">
+                                    {item.qty} {unit}
+                                  </span>
+                                  <button
+                                    onClick={() => updateQty(item.id, item.qty + step)}
+                                    className="rounded-md bg-white p-1.5 text-[#2C643E] shadow-sm transition-colors hover:bg-green-50"
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+
+                                <button
+                                  onClick={() => removeItem(item.id)}
+                                  className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
 
                       <div id="delivery-form" className="mt-6 space-y-4 border-t pt-6">
@@ -377,7 +385,7 @@ export function FloatingCart() {
                           type="text"
                           placeholder="الاسم الثلاثي"
                           value={customer.name}
-                          onChange={e => setCustomer({ ...customer, name: e.target.value })}
+                          onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
                           disabled={isSubmitting}
                           className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
                           dir="rtl"
@@ -387,7 +395,7 @@ export function FloatingCart() {
                           type="tel"
                           placeholder="رقم الهاتف"
                           value={customer.phone}
-                          onChange={e => setCustomer({ ...customer, phone: e.target.value })}
+                          onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
                           disabled={isSubmitting}
                           className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
                           dir="rtl"
@@ -398,14 +406,14 @@ export function FloatingCart() {
                           rows={1}
                           placeholder="العنوان بالتفصيل (المنطقة، الشارع، العمارة)"
                           value={customer.address}
-                          onChange={e => setCustomer({ ...customer, address: e.target.value })}
+                          onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
                           disabled={isSubmitting}
                           className="max-h-[120px] w-full resize-none overflow-y-auto rounded-xl border bg-gray-50 px-4 py-3 text-right leading-relaxed outline-none focus:border-[#2C643E] focus:bg-white"
                           dir="rtl"
                         />
                       </div>
 
-                      <div className="mt-6 mb-2 space-y-4 border-t pt-6">
+                      <div className="mb-2 mt-6 space-y-4 border-t pt-6">
                         <h3 className="w-full text-center text-lg font-bold text-gray-800">طريقة الدفع</h3>
                         <div className="grid grid-cols-2 gap-3" dir="rtl">
                           <button
@@ -440,7 +448,7 @@ export function FloatingCart() {
                 </div>
 
                 {!isOrdered && items.length > 0 && (
-                  <div className="relative shrink-0 border-t bg-white px-6 py-4 pb-safe">
+                  <div className="relative shrink-0 border-t bg-white pb-safe px-6 py-4">
                     <AnimatePresence>
                       {showScrollArrow && (
                         <motion.div
