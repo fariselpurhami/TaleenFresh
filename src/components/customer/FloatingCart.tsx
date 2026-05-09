@@ -153,18 +153,32 @@ export function FloatingCart() {
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 1000)
+      const timeoutId = setTimeout(() => controller.abort(), 3000)
       const { error } = await supabase.from('orders').insert([orderData]).abortSignal(controller.signal)
       clearTimeout(timeoutId)
-      if (error) throw error
-    } catch {
-      const existingStr = localStorage.getItem('offline_orders')
-      const existingQueue = existingStr ? JSON.parse(existingStr) : []
-      existingQueue.push(orderData)
-      localStorage.setItem('offline_orders', JSON.stringify(existingQueue))
-    }
+      
+      if (error) {
+        throw new Error(error.message);
+      }
 
-    completeLocalSuccessFlow()
+      completeLocalSuccessFlow()
+
+    } catch (err: any) {
+
+      if (err.name === 'AbortError' || err.message.includes('Failed to fetch')) {
+        const existingStr = localStorage.getItem('offline_orders')
+        const existingQueue = existingStr ? JSON.parse(existingStr) : []
+        existingQueue.push(orderData)
+        localStorage.setItem('offline_orders', JSON.stringify(existingQueue))
+        completeLocalSuccessFlow()
+      } else {
+       
+        console.error("Critical DB Error:", err);
+        setErrorMsg("عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.")
+        setIsSubmitting(false)
+        trigger('error')
+      }
+    }
   }
 
   const handleCardCheckout = async (orderData: any) => {

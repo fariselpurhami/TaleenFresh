@@ -85,7 +85,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
 
   return (
     <div dir="rtl" className="relative min-h-[100dvh] overflow-hidden bg-transparent pb-24">
-      <header className="flex items-center justify-between px-6 pb-4 pt-0">
+      <header className="flex items-center justify-between px-6 pb-1 pt-0">
         <div className="flex items-center gap-3">
           <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white p-0.5 shadow-md">
             <img src="/icon-512x512.png" alt="Taleen Fresh Logo" className="h-full w-full object-contain" />
@@ -115,6 +115,10 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="ابحث عن الخضروات والفواكه..."
             className="flex-1 bg-transparent text-[16px] font-bold text-gray-800 outline-none placeholder:font-medium placeholder:text-gray-400"
+	    autoComplete="off"
+            autoCorrect="off"
+            spellCheck="false"
+	    suppressHydrationWarning
           />
         </div>
       </div>
@@ -123,7 +127,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
         <div className="mb-4 flex items-center justify-center px-6">
           <h3 className="text-lg font-black text-foreground">الأقسام</h3>
         </div>
-        <div className="flex justify-center gap-10 pb-2 pt-1">
+        <div className="flex justify-center gap-4 pb-2 pt-1">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.id}

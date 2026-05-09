@@ -51,12 +51,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl" className={`${cairo.variable} scroll-smooth`}>
+    <html lang="ar" dir="rtl" className={`${cairo.variable} scroll-smooth`} suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
-      <body className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased selection:bg-[#2C643E]/20 selection:text-[#2C643E] bg-pattern-watermark custom-scrollbar overflow-x-hidden flex flex-col mx-auto relative shadow-2xl transition-all duration-500 ease-in-out
-  max-w-[430px] portrait:max-w-[430px] landscape:max-w-full md:max-w-[430px] md:landscape:max-w-full"
+      <body className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased selection:bg-[#2C643E]/20 selection:text-[#2C643E] bg-pattern-watermark custom-scrollbar overflow-x-hidden flex flex-col mx-auto relative shadow-2xl transition-all duration-500 ease-in-out max-w-[430px] portrait:max-w-[430px] landscape:max-w-full md:max-w-[430px] md:landscape:max-w-full"
+        suppressHydrationWarning
       >
         {children}
       </body>
