@@ -120,7 +120,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
       </div>
 
       <div className="mb-8">
-        <div className="mb-4 flex items-center justify-between px-6">
+        <div className="mb-4 flex items-center justify-center px-6">
           <h3 className="text-lg font-black text-foreground">الأقسام</h3>
         </div>
         <div className="flex justify-center gap-10 pb-2 pt-1">
