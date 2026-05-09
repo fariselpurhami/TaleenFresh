@@ -107,14 +107,14 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
       </div>
 
       <div className="relative z-10 mb-6 mt-2 px-6">
-        <div className="flex w-full items-center gap-3 rounded-2xl bg-white px-4 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.06)] ring-[#2C643E]/50 transition-all focus-within:ring-2">
+        <div className="flex w-full items-center gap-3 rounded-2xl bg-gray-100 px-4 py-4 transition-all focus-within:bg-white focus-within:ring-2 ring-[#2C643E]/50 focus-within:shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
           <Search className="text-[#2C643E]" size={20} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="ابحث عن الخضروات والفواكه..."
-            className="flex-1 bg-transparent text-[16px] font-bold text-foreground outline-none placeholder:font-medium placeholder:text-muted-foreground/50"
+            className="flex-1 bg-transparent text-[16px] font-bold text-gray-800 outline-none placeholder:font-medium placeholder:text-gray-400"
           />
         </div>
       </div>
