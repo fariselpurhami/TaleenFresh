@@ -250,7 +250,7 @@ export function FloatingCart() {
             animate={{ y: 0, x: '-50%' }}
             exit={{ y: '100%', x: '-50%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
-            className="fixed bottom-0 left-[50%] z-[70] flex h-auto w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none sm:max-h-[80vh] max-h-[90vh]"
+            className="fixed bottom-0 left-[50%] z-[70] flex h-auto w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none sm:max-h-[80vh] max-h-[80vh]"
           >
             <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-6 py-4">
               <div className="flex items-center gap-2 text-xl font-bold text-gray-800">
