@@ -101,7 +101,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
         <h1 className="mb-1 text-right text-2xl font-black leading-tight text-foreground">
           مُنتجات طازجة تُقطف بعناية<br />لتصلك بأعلى جودة.
         </h1>
-        <p className="mt-2 inline-block rounded-lg border border-gray-100 bg-white/50 px-3 py-1.5 text-right text-sm font-medium text-muted-foreground shadow-sm backdrop-blur-sm">
+        <p className="mt-2 inline-block rounded-lg border border-gray-100 bg-[#2C643E] px-3 py-1.5 text-right text-sm font-medium text-white shadow-sm backdrop-blur-sm">
           ننتقي أفضلَ المنتجاتِ يوميًّا 🍃 | مُتوفِّرون لخدمتكُم داخلَ مدينةِ كفر الشيخ من 8:00 ص حتَّى 10:00 م.
         </p>
       </div>
