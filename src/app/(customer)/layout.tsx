@@ -51,13 +51,13 @@ export default function CustomerLayout({ children }: { readonly children: React.
       )}>
         
         <div 
-          className="pointer-events-none absolute inset-0 z-0"
+          className="pointer-events-none absolute inset-0 z-0 mix-blend-multiply"
           style={{
             backgroundImage: "url('/pattern.jpg')",
             backgroundRepeat: "repeat",
             backgroundSize: "400px",
             backgroundPosition: "0 0",
-            opacity: 0.19
+            opacity: 0.30 // لو حسيتها خفيفة ممكن تخليها 0.25 أو 0.30
           }}
         />
 

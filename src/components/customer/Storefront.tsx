@@ -92,7 +92,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
           </div>
           <div>
             <h2 className="text-sm font-black text-foreground">{greeting}</h2>
-            <p className="text-xs font-medium text-muted-foreground">ماذا ستشتري اليوم؟</p>
+            <p className="text-xs font-medium text-foreground">ماذا ستشتري اليوم؟</p>
           </div>
         </div>
       </header>
