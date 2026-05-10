@@ -62,6 +62,7 @@ export default function CheckoutForm() {
       <div className="space-y-2">
         <Label htmlFor="fullName">الاسم بالكامل</Label>
         <Input
+	  data-testid="input-customer-name"
           id="fullName"
           name="fullName"
           value={customerInfo.fullName}
@@ -74,6 +75,7 @@ export default function CheckoutForm() {
       <div className="space-y-2">
         <Label htmlFor="phone">رقم التليفون</Label>
         <Input
+	  data-testid="input-customer-phone"
           id="phone"
           name="phone"
           type="tel"

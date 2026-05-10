@@ -261,6 +261,7 @@ export function FloatingCart() {
           />
 
           <motion.div
+	    data-testid="cart-container"
             initial={{ y: '100%', x: '-50%' }}
             animate={{ y: 0, x: '-50%' }}
             exit={{ y: '100%', x: '-50%' }}
@@ -397,6 +398,7 @@ export function FloatingCart() {
                         </h3>
 
                         <input
+			  data-testid="input-customer-name"
                           type="text"
                           placeholder="الاسم الثلاثي"
                           value={customerInfo.fullName}
@@ -407,6 +409,7 @@ export function FloatingCart() {
                         />
 
                         <input
+			  data-testid="input-customer-phone"
                           type="tel"
                           placeholder="رقم الهاتف"
                           value={customerInfo.phone}
