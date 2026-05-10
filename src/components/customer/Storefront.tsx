@@ -22,9 +22,9 @@ interface Product {
 
 const CATEGORIES = [
   { id: 'all', name: 'الكل', icon: '🥗', color: 'bg-orange-100' },
-  { id: 'fruits', name: 'فواكه', icon: '🍇', color: 'bg-red-100' },
-  { id: 'leaf_greens', name: 'ورقيات', icon: '🥬', color: 'bg-green-100' },
-  { id: 'veggies', name: 'خضروات', icon: '🥕', color: 'bg-emerald-100' },
+  { id: 'veggies', name: 'خضروات', icon: '🫜 ', color: 'bg-emerald-100' },
+  { id: 'fruits', name: 'فواكه', icon: '🍒', color: 'bg-red-100' },
+  { id: 'leaf_greens', name: 'ورقيات', icon: '☘️ ', color: 'bg-green-100' },
 ]
 
 export default function Storefront({ initialProducts }: { initialProducts: Product[] }) {
@@ -40,7 +40,13 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
   useEffect(() => {
     setIsMounted(true)
     const hour = new Date().getHours()
-    setGreeting(hour < 12 ? 'صباح الخير ☀️' : 'مساء الخير 🌙')
+    if (hour >= 5 && hour < 12) {
+      setGreeting('صباح الخير ☀️')
+    } else if (hour >= 12 && hour < 18) {
+      setGreeting('مساء الخير 🌤️')
+    } else {
+      setGreeting('مساء الخير 🌙')
+    }
     setLiveProducts(initialProducts)
 
     const handleCartBounce = () => {
@@ -113,7 +119,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث عن الخضروات والفواكه..."
+            placeholder="ابحث عن الخضروات والفواكه والورقيات..."
             className="flex-1 bg-transparent text-[16px] font-bold text-gray-800 outline-none placeholder:font-medium placeholder:text-gray-400"
 	    autoComplete="off"
             autoCorrect="off"
@@ -143,7 +149,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
                 <span className="text-2xl">{cat.icon}</span>
               </motion.div>
               <span
-                className={`text-xs font-bold transition-colors ${
+                className={`text-xs font-bold whitespace-nowrap transition-colors ${
                   selectedCategory === cat.id ? 'text-[#2C643E]' : 'text-muted-foreground'
                 }`}
               >
@@ -157,7 +163,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
       <div className="mb-8 px-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-black text-foreground">منتجات طازجة</h3>
-          <span className="rounded-md bg-green-100 px-2 py-1 text-xs font-bold text-[#2C643E]">
+          <span className="rounded-full bg-[#4B4B4B] px-2 py-1 text-xs font-bold text-white">
             {filteredProducts.length} منتج
           </span>
         </div>
