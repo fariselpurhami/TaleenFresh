@@ -2,6 +2,7 @@
 
 'use client'
 
+import { useCheckout } from '@/store/useCheckout'
 import React, { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCart } from '@/hooks/useCart'
@@ -30,7 +31,7 @@ export function FloatingCart() {
   const [errorMsg, setErrorMsg] = useState('')
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod')
-  const [customer, setCustomer] = useState({ name: '', phone: '', address: '' })
+  const { customerInfo, setCustomerInfo } = useCheckout()
   const [showScrollArrow, setShowScrollArrow] = useState(false)
 
   const { items, getCartTotal, updateQty, clearCart, removeItem, _hasHydrated } = useCart()
@@ -42,7 +43,7 @@ export function FloatingCart() {
   const cartTotal = getCartTotal()
   const DELIVERY_FEE = 25
   const finalTotal = cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0
-  const isFormIncomplete = !customer.name || !customer.phone || !customer.address
+  const isFormIncomplete = !customerInfo.fullName || !customerInfo.phone || !customerInfo.address
 
   const resetCheckoutState = () => {
     setIsSubmitting(false)
@@ -52,7 +53,7 @@ export function FloatingCart() {
   }
 
   const resetCustomerState = () => {
-    setCustomer({ name: '', phone: '', address: '' })
+   
     setPaymentMethod('cod')
   }
 
@@ -127,7 +128,7 @@ export function FloatingCart() {
       textarea.style.height = 'auto'
       textarea.style.height = `${textarea.scrollHeight}px`
     }
-  }, [customer.address])
+  }, [customerInfo.address])
 
   const completeLocalSuccessFlow = () => {
     trigger('success')
@@ -217,9 +218,9 @@ export function FloatingCart() {
     trigger('medium')
 
     const orderData = {
-      customer_name: customer.name,
-      customer_phone: customer.phone,
-      customer_address: customer.address,
+      customer_name: customerInfo.fullName,
+      customer_phone: customerInfo.phone,
+      customer_address: customerInfo.address,
       items: items.map((item) => ({
         name: item.name,
         qty: item.qty,
@@ -316,7 +317,7 @@ export function FloatingCart() {
                     <div className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
                       <CheckCircle2 className="h-20 w-20 text-green-500" />
                       <h3 className="text-2xl font-bold text-gray-800">تم استلام طلبك!</h3>
-                      <p className="text-gray-500">جاري التجهيز الآن يا {customer.name.split(' ')[0]}</p>
+                      <p className="text-gray-500">جاري التجهيز الآن يا {customerInfo.fullName.split(' ')[0]}</p>
                     </div>
                   ) : items.length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
@@ -398,8 +399,8 @@ export function FloatingCart() {
                         <input
                           type="text"
                           placeholder="الاسم الثلاثي"
-                          value={customer.name}
-                          onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                          value={customerInfo.fullName}
+                          onChange={(e) => setCustomerInfo({ fullName: e.target.value })}
                           disabled={isSubmitting}
                           className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
                           dir="rtl"
@@ -408,8 +409,8 @@ export function FloatingCart() {
                         <input
                           type="tel"
                           placeholder="رقم الهاتف"
-                          value={customer.phone}
-                          onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+                          value={customerInfo.phone}
+                          onChange={(e) => setCustomerInfo({ phone: e.target.value })}
                           disabled={isSubmitting}
                           className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
                           dir="rtl"
@@ -419,8 +420,8 @@ export function FloatingCart() {
                           ref={addressRef}
                           rows={1}
                           placeholder="العنوان بالتفصيل (المنطقة، الشارع، العمارة)"
-                          value={customer.address}
-                          onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
+                          value={customerInfo.address}
+                          onChange={(e) => setCustomerInfo({ address: e.target.value })}
                           disabled={isSubmitting}
                           className="max-h-[120px] w-full resize-none overflow-y-auto rounded-xl border bg-gray-50 px-4 py-3 text-right leading-relaxed outline-none focus:border-[#2C643E] focus:bg-white"
                           dir="rtl"
