@@ -1,4 +1,4 @@
-// src/lib/supabase/client.ts
+//  src/lib/supabase/client.ts
 
 import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
