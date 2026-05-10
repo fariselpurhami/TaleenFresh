@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search, Home, ShoppingBag, ShoppingCart } from 'lucide-react'
 import { motion, AnimatePresence, useAnimation } from 'framer-motion'
 import { ProductCard } from '@/components/customer/ProductCard'
@@ -10,32 +10,54 @@ import { useCart } from '@/hooks/useCart'
 import { FloatingCart } from '@/components/customer/FloatingCart'
 import { supabase } from '@/lib/supabase/client'
 
-interface Product {
-  id: string
-  name_en: string
-  name_ar?: string
-  category: string
-  image_url: string
-  price_per_kg: number
-  is_available: boolean
+// إضافة readonly لحماية البيانات من التعديل غير المقصود
+export interface Product {
+  readonly id: string
+  readonly name_en: string
+  readonly name_ar?: string
+  readonly category: string
+  readonly image_url: string
+  readonly price_per_kg: number
+  readonly is_available: boolean
 }
 
-const CATEGORIES = [
+interface CategoryConfig {
+  readonly id: string
+  readonly name: string
+  readonly icon: string
+  readonly color: string
+}
+
+interface StorefrontProps {
+  readonly initialProducts: readonly Product[]
+}
+
+const CATEGORIES: readonly CategoryConfig[] = [
   { id: 'all', name: 'الكل', icon: '🥗', color: 'bg-orange-100' },
   { id: 'veggies', name: 'خضروات', icon: '🫜 ', color: 'bg-emerald-100' },
   { id: 'fruits', name: 'فواكه', icon: '🍒', color: 'bg-red-100' },
   { id: 'leaf_greens', name: 'ورقيات', icon: '☘️ ', color: 'bg-green-100' },
 ]
 
-export default function Storefront({ initialProducts }: { initialProducts: Product[] }) {
+export default function Storefront({ initialProducts }: StorefrontProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [greeting, setGreeting] = useState('مرحباً')
   const [isMounted, setIsMounted] = useState(false)
-  const [liveProducts, setLiveProducts] = useState(initialProducts)
+  const [liveProducts, setLiveProducts] = useState<readonly Product[]>(initialProducts)
+  
   const { getTotalItems } = useCart()
   const totalItems = getTotalItems()
   const cartControls = useAnimation()
+
+  // استخدام useCallback لمنع إعادة إنشاء الدالة وتحسين أداء الأنيميشن
+  const handleCartBounce = useCallback(() => {
+    cartControls.start({
+      scale: [1, 1.2, 0.9, 1.1, 1],
+      y: [0, -8, 4, -2, 0],
+      transition: { duration: 0.5, ease: 'easeInOut' }
+    }).catch((err) => console.error('[Storefront] Animation error:', err))
+  }, [cartControls])
 
   useEffect(() => {
     setIsMounted(true)
@@ -48,14 +70,6 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
       setGreeting('مساء الخير 🌙')
     }
     setLiveProducts(initialProducts)
-
-    const handleCartBounce = () => {
-      cartControls.start({
-        scale: [1, 1.2, 0.9, 1.1, 1],
-        y: [0, -8, 4, -2, 0],
-        transition: { duration: 0.5, ease: 'easeInOut' }
-      })
-    }
 
     window.addEventListener('cart-bounce', handleCartBounce)
 
@@ -70,21 +84,29 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
           )
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.error('[Storefront] Realtime subscription error:', err)
+      })
 
     return () => {
-      supabase.removeChannel(channel)
       window.removeEventListener('cart-bounce', handleCartBounce)
+      supabase.removeChannel(channel).catch((err) => 
+        console.error('[Storefront] Error removing channel:', err)
+      )
     }
-  }, [initialProducts, cartControls])
+  }, [initialProducts, handleCartBounce])
 
+  // تحسين منطق البحث وتجاهل المسافات الزائدة واستخدام المعاملات الآمنة
   const filteredProducts = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
     return liveProducts.filter((product) => {
-      const query = searchQuery.toLowerCase()
-      const nameEn = product.name_en?.toLowerCase() || ''
-      const nameAr = product.name_ar?.toLowerCase() || ''
-      const matchesSearch = nameEn.includes(query) || nameAr.includes(query)
+      const nameEn = product.name_en?.toLowerCase() ?? ''
+      const nameAr = product.name_ar?.toLowerCase() ?? ''
+      
+      const matchesSearch = normalizedQuery === '' || nameEn.includes(normalizedQuery) || nameAr.includes(normalizedQuery)
       const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+      
       return matchesSearch && matchesCategory
     })
   }, [liveProducts, searchQuery, selectedCategory])
@@ -108,7 +130,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
           مُنتجات طازجة تُقطف بعناية<br />لتصلك بأعلى جودة.
         </h1>
         <p className="mt-2 inline-block rounded-lg border border-gray-100 bg-[#2C643E] px-3 py-1.5 text-right text-sm font-medium text-white shadow-sm backdrop-blur-sm">
-          ننتقي أفضلَ المنتجاتِ يوميًّا 🍃 | مُتوفِّرون لخدمتكُم داخلَ مدينةِ كفر الشيخ من 8:00 ص حتَّى 10:00 م.
+          ننتقي أفضلَ المنتجاتِ يوميًّا 🍃 | مُتوفِّرون لخدمتكُم داخلَ مدينةِ كفر الشيخ من 8:00 ص حتَّى 10:00 م.
         </p>
       </div>
 
@@ -121,10 +143,10 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="ابحث عن الخضروات والفواكه والورقيات..."
             className="flex-1 bg-transparent text-[16px] font-bold text-gray-800 outline-none placeholder:font-medium placeholder:text-gray-400"
-	    autoComplete="off"
+            autoComplete="off"
             autoCorrect="off"
             spellCheck="false"
-	    suppressHydrationWarning
+            suppressHydrationWarning
           />
         </div>
       </div>
@@ -184,7 +206,7 @@ export default function Storefront({ initialProducts }: { initialProducts: Produ
                 >
                   <ProductCard
                     id={product.id}
-                    name={product.name_ar || product.name_en}
+                    name={product.name_ar ?? product.name_en ?? ''}
                     price={product.price_per_kg}
                     imageUrl={product.image_url}
                     isAvailable={product.is_available}
