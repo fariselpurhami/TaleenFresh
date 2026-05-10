@@ -84,6 +84,7 @@ export const ProductCard = React.memo(function ProductCard({
         </div>
 
         <button
+	  data-testid="add-to-cart-button"
           onClick={handleAdd}
           disabled={!isAvailable}
           className={`relative flex h-10 w-full shrink-0 items-center justify-center gap-2 overflow-hidden rounded-xl text-[13px] font-bold text-white shadow-sm transition-all duration-300 disabled:opacity-50 active:scale-95 ${
@@ -94,6 +95,7 @@ export const ProductCard = React.memo(function ProductCard({
             {isAdded ? (
               <motion.div
                 key="added"
+		data-testid="added-to-cart-icon"
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -20, opacity: 0 }}
