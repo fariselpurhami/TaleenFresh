@@ -46,6 +46,7 @@ export default function CheckoutForm() {
         <div className="space-y-2">
           <Label htmlFor="address">العنوان بالتفصيل</Label>
           <Textarea
+	    data-testid="input-customer-address"
             id="address"
             name="address"
             disabled

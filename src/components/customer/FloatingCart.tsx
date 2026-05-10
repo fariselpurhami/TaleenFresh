@@ -420,6 +420,7 @@ export function FloatingCart() {
                         />
 
                         <textarea
+			  data-testid="input-customer-address"
                           ref={addressRef}
                           rows={1}
                           placeholder="العنوان بالتفصيل (المنطقة، الشارع، العمارة)"
@@ -497,6 +498,7 @@ export function FloatingCart() {
                     </div>
 
                     <button
+		      data-testid="checkout-submit-button"
                       onClick={handleCheckout}
                       disabled={isSubmitting}
                       className={`flex w-full items-center justify-center rounded-2xl bg-[#2C643E] py-4 text-lg font-black text-white shadow-[0_8px_20px_rgba(44,100,62,0.3)] transition-all ${
