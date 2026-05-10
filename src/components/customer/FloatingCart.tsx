@@ -315,10 +315,10 @@ export function FloatingCart() {
                   className="custom-scrollbar relative flex-1 overflow-y-auto px-6 pb-12 pt-4"
                 >
                   {isOrdered ? (
-                    <div className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
+                    <div data-testid="order-success-view" className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
                       <CheckCircle2 className="h-20 w-20 text-green-500" />
                       <h3 className="text-2xl font-bold text-gray-800">تم استلام طلبك!</h3>
-                      <p className="text-gray-500">جاري التجهيز الآن يا {customerInfo.fullName.split(' ')[0]}</p>
+                      <p data-testid="order-success-message" className="text-gray-500">جاري التجهيز الآن يا {customerInfo.fullName.split(' ')[0]}</p>
                     </div>
                   ) : items.length === 0 ? (
                     <div className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
