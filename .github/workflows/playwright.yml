@@ -1,10 +1,14 @@
-name: 🚀 Elite CI/CD Pipeline
+name: Elite CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,41 +19,48 @@ jobs:
     name: Build & E2E Tests
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    
-    # سحب المفاتيح الحقيقية من خزانة GitHub السرية
+
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      WORKER_SECRET_TOKEN: ${{ secrets.WORKER_SECRET_TOKEN }}
+      ADMIN_SECRET_PIN: ${{ secrets.ADMIN_SECRET_PIN }}
+      ADMIN_SECRET_TOKEN: ${{ secrets.ADMIN_SECRET_TOKEN }}
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+      PAYMOB_HMAC_SECRET: ${{ secrets.PAYMOB_HMAC_SECRET }}
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
       SENTRY_DISABLE_AUTO_UPLOAD: "true"
       NEXT_DISABLE_ESLINT: "1"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-      
+
     steps:
-      - name: 📥 Checkout Code
+      - name: Checkout Code
         uses: actions/checkout@v4
-        
-      - name: ⚙️ Setup Node.js
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24' # تم التحديث لأحدث إصدار مستقر لإنهاء التحذير
+          node-version: '24'
           cache: 'npm'
-          
-      - name: 📦 Install Dependencies
+
+      - name: Install Dependencies
         run: npm ci
-        
-      - name: 🎭 Install Playwright Browsers
+
+      - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: 🏗️ Build Next.js Application
+      - name: Build Next.js Application
         run: npm run build
-        
-      - name: 🧪 Run Playwright E2E Tests
+
+      - name: Run Playwright E2E Tests
         run: |
           npm run start &
           npx wait-on http://localhost:3000
           npx playwright test
-          
-      - name: 📊 Upload Test Results
+
+      - name: Upload Test Results
         uses: actions/upload-artifact@v4
         if: failure()
         with:
