@@ -1,25 +1,32 @@
 // src/app/api/webhooks/paymob/worker/route.ts
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const WORKER_SECRET_TOKEN = process.env.WORKER_SECRET_TOKEN;
 const SAAS_COMMISSION_RATE = 0.025;
 const MAX_RETRY_COUNT = 3;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !WORKER_SECRET_TOKEN) {
-  throw new Error('CRITICAL: Missing environment variables for Paymob background worker.');
+function getRequiredEnvVar(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`CRITICAL: Missing required environment variable: ${key}`);
+  }
+  return value;
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
-  },
-});
+function getSupabaseAdminClient(): SupabaseClient {
+  return createClient(
+    getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
+    getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+}
 
 interface PaymentEvent {
   readonly transaction_id: string;
@@ -66,7 +73,7 @@ function extractPaymentDetails(payload: unknown): PaymobObjPayload | null {
   };
 }
 
-async function processPayment(payload: unknown): Promise<void> {
+async function processPayment(supabaseAdmin: SupabaseClient, payload: unknown): Promise<void> {
   const details = extractPaymentDetails(payload);
 
   if (!details) {
@@ -104,8 +111,10 @@ async function processPayment(payload: unknown): Promise<void> {
 
 export async function POST(req: Request) {
   try {
+    const workerSecretToken = getRequiredEnvVar('WORKER_SECRET_TOKEN');
     const authHeader = req.headers.get('authorization');
-    if (!authHeader || authHeader !== `Bearer ${WORKER_SECRET_TOKEN}`) {
+
+    if (!authHeader || authHeader !== `Bearer ${workerSecretToken}`) {
       console.warn('[Payment Worker] Unauthorized invocation attempt.');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -128,6 +137,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unprocessable Entity' }, { status: 422 });
     }
 
+    const supabaseAdmin = getSupabaseAdminClient();
+
     const { data: eventData, error: fetchError } = await supabaseAdmin
       .from('payment_events')
       .select('transaction_id, payload, status, retry_count')
@@ -143,7 +154,7 @@ export async function POST(req: Request) {
     const event = eventData as PaymentEvent;
 
     try {
-      await processPayment(event.payload);
+      await processPayment(supabaseAdmin, event.payload);
 
       const { error: updateError } = await supabaseAdmin
         .from('payment_events')

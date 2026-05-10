@@ -3,13 +3,20 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useAdminOrders } from '@/providers/AdminOrdersProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BellRing, X, ShoppingBag } from 'lucide-react';
 
+import { useAdminOrders } from '@/providers/AdminOrdersProvider';
+
+export interface RadarOrderData {
+  customer_name?: string;
+  total_price?: number | string;
+  [key: string]: unknown;
+}
+
 export function OrderRadar() {
   const { newOrder, clearNewOrder } = useAdminOrders();
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDismiss = useCallback(() => {
     if (timerRef.current) {
@@ -36,9 +43,11 @@ export function OrderRadar() {
     };
   }, [newOrder, clearNewOrder]);
 
+  const orderData = newOrder as RadarOrderData | null | undefined;
+
   return (
     <AnimatePresence>
-      {newOrder && (
+      {orderData && (
         <motion.div
           initial={{ opacity: 0, y: -50, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -57,15 +66,19 @@ export function OrderRadar() {
               <BellRing className="h-6 w-6 animate-pulse" />
             </div>
 
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-black text-gray-900 leading-tight">طلب جديد وصل!</h3>
-                  <p className="mt-0.5 text-xs font-bold text-gray-500">منذ لحظات</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="leading-tight text-base font-black text-gray-900">
+                    طلب جديد وصل!
+                  </h3>
+                  <p className="mt-0.5 text-xs font-bold text-gray-500">
+                    منذ لحظات
+                  </p>
                 </div>
                 <button
                   onClick={handleDismiss}
-                  className="rounded-full bg-gray-50 p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 shrink-0"
+                  className="shrink-0 rounded-full bg-gray-50 p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
                   aria-label="إغلاق التنبيه"
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
@@ -74,11 +87,11 @@ export function OrderRadar() {
 
               <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 p-2.5 shadow-sm">
                 <span className="max-w-[120px] truncate text-sm font-bold text-gray-700">
-                  {newOrder.customer_name || 'عميل'}
+                  {orderData.customer_name ? String(orderData.customer_name) : 'عميل'}
                 </span>
-                <span className="flex items-center gap-1.5 font-mono text-sm font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-md shrink-0">
+                <span className="flex shrink-0 items-center gap-1.5 rounded-md bg-green-50 px-2 py-0.5 font-mono text-sm font-black text-green-600">
                   <ShoppingBag className="h-3.5 w-3.5" aria-hidden="true" />
-                  {Number(newOrder.total_price || 0).toLocaleString('ar-EG')} ج.م
+                  {Number(orderData.total_price || 0).toLocaleString('ar-EG')} ج.م
                 </span>
               </div>
             </div>

@@ -12,7 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts';
 import { TrendingUp, Package, Clock, DollarSign } from 'lucide-react';
 
@@ -34,15 +33,25 @@ export interface AnalyticsDashboardProps {
   orders: Order[];
 }
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: Record<string, unknown>;
+  }>;
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length > 0) {
     const dataPayload = payload[0];
     const isRevenue = dataPayload.name === 'revenue';
     const value = dataPayload.value ?? 0;
-    
+
     return (
-      <div 
-        className="rounded-2xl border border-white/20 bg-black/85 px-5 py-4 text-white shadow-xl backdrop-blur-xl" 
+      <div
+        className="rounded-2xl border border-white/20 bg-black/85 px-5 py-4 text-white shadow-xl backdrop-blur-xl"
         dir="rtl"
         role="tooltip"
       >
@@ -64,7 +73,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     const productSales: Record<string, number> = {};
 
     const formatter = new Intl.DateTimeFormat('ar-EG', { weekday: 'short' });
-    
+
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -81,7 +90,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
 
         const date = new Date(order.created_at);
         const dayName = formatter.format(date);
-        
+
         if (revenueByDay[dayName] !== undefined) {
           revenueByDay[dayName] += order.total_price;
         }
@@ -105,16 +114,15 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5);
 
-    const averageOrderValue = orders.length > 0 
-      ? Math.round(totalRevenue / orders.length) 
-      : 0;
+    const averageOrderValue =
+      orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
 
-    return { 
-      totalRevenue, 
-      totalItemsSold, 
-      revenueChart, 
+    return {
+      totalRevenue,
+      totalItemsSold,
+      revenueChart,
       topProducts,
-      averageOrderValue 
+      averageOrderValue,
     };
   }, [orders]);
 
@@ -170,8 +178,13 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
               transition={{ delay: i * 0.1, type: 'spring', stiffness: 300 }}
               className={`flex flex-col items-start gap-4 rounded-3xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md sm:flex-row sm:items-center ${card.border}`}
             >
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14 ${card.bg}`}>
-                <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${card.color}`} aria-hidden="true" />
+              <div
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14 ${card.bg}`}
+              >
+                <Icon
+                  className={`h-5 w-5 sm:h-6 sm:w-6 ${card.color}`}
+                  aria-hidden="true"
+                />
               </div>
               <div className="mt-2 flex flex-col justify-center sm:mt-0">
                 <h2 className="mb-1 text-[11px] font-bold text-gray-500 sm:text-xs">
@@ -200,8 +213,8 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
           <div className="relative min-h-0 w-full flex-1">
             <div className="absolute inset-0">
               <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
-                <AreaChart 
-                  data={analyticsData.revenueChart} 
+                <AreaChart
+                  data={analyticsData.revenueChart}
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                 >
                   <defs>
@@ -211,33 +224,38 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis 
-                    dataKey="day" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }} 
-                    dy={10} 
+                  <XAxis
+                    dataKey="day"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }}
+                    dy={10}
                   />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold', fontFamily: 'monospace' }} 
-                    width={60} 
-                    orientation="left" 
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{
+                      fill: '#9ca3af',
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                      fontFamily: 'monospace',
+                    }}
+                    width={60}
+                    orientation="left"
                   />
-                  <Tooltip 
-                    content={<CustomTooltip />} 
-                    cursor={{ stroke: '#2C643E', strokeWidth: 1, strokeDasharray: '4 4' }} 
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{ stroke: '#2C643E', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    name="revenue" 
-                    stroke="#2C643E" 
-                    strokeWidth={4} 
-                    fillOpacity={1} 
-                    fill="url(#colorRevenue)" 
-                    activeDot={{ r: 6, strokeWidth: 0, fill: '#2C643E' }} 
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    name="revenue"
+                    stroke="#2C643E"
+                    strokeWidth={4}
+                    fillOpacity={1}
+                    fill="url(#colorRevenue)"
+                    activeDot={{ r: 6, strokeWidth: 0, fill: '#2C643E' }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -255,12 +273,12 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
             <Package className="h-5 w-5 text-[#2C643E]" aria-hidden="true" />
             المنتجات الأكثر مبيعاً
           </h3>
-          
+
           <div className="custom-scrollbar mt-4 flex flex-1 flex-col justify-around gap-3 overflow-y-auto pr-1">
             {analyticsData.topProducts.map((product, index) => {
               const maxQty = Math.max(...analyticsData.topProducts.map((p) => p.qty), 1);
               const widthPercentage = `${(product.qty / maxQty) * 100}%`;
-              
+
               return (
                 <div key={product.name} className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-sm">
@@ -271,20 +289,26 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
                       {product.qty.toLocaleString('ar-EG')} كجم
                     </span>
                   </div>
-                 
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100" dir="rtl" aria-hidden="true">
+
+                  <div
+                    className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100"
+                    dir="rtl"
+                    aria-hidden="true"
+                  >
                     <motion.div
                       initial={{ width: 0 }}
                       whileInView={{ width: widthPercentage }}
                       viewport={{ once: true }}
-                      transition={{ duration: 1, ease: "easeOut", delay: index * 0.1 }}
-                      className={`h-full rounded-full ${index === 0 ? 'bg-[#2C643E]' : 'bg-[#86efac]'}`}
+                      transition={{ duration: 1, ease: 'easeOut', delay: index * 0.1 }}
+                      className={`h-full rounded-full ${
+                        index === 0 ? 'bg-[#2C643E]' : 'bg-[#86efac]'
+                      }`}
                     />
                   </div>
                 </div>
               );
             })}
-            
+
             {analyticsData.topProducts.length === 0 && (
               <div className="flex h-full items-center justify-center text-sm font-medium text-gray-400">
                 لا توجد بيانات مبيعات حتى الآن

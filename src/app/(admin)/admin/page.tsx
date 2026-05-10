@@ -1,10 +1,9 @@
-// src/app/(admin)/admin/page.tsx
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentProps } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, ShoppingCart, BarChart3 } from 'lucide-react';
+
 import { supabase } from '@/lib/supabase/client';
 import OrdersClient from '@/components/admin/OrdersClient';
 import { AdminProductCard } from '@/components/admin/AdminProductCard';
@@ -13,15 +12,13 @@ import { fetchAdminDashboardData } from '@/app/actions/admin-actions';
 
 type TabType = 'orders' | 'inventory' | 'analytics';
 
-export interface Order {
+export type Order = NonNullable<ComponentProps<typeof OrdersClient>['initialOrders']>[number] & {
   id: string;
-  [key: string]: unknown;
-}
+};
 
-export interface Product {
+export type Product = NonNullable<ComponentProps<typeof AdminProductCard>['product']> & {
   id: string;
-  [key: string]: unknown;
-}
+};
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<TabType>('orders');
@@ -40,12 +37,12 @@ export default function AdminDashboardPage() {
         if (!isMounted) return;
 
         if (result.success) {
-          setProducts((result.products as Product[]) || []);
-          setOrders((result.orders as Order[]) || []);
+          setProducts((result.products as unknown as Product[]) || []);
+          setOrders((result.orders as unknown as Order[]) || []);
         } else {
           setErrorMsg('فشل تحميل البيانات. تأكد من إعدادات الـ RLS والمفاتيح.');
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setErrorMsg('حدث خطأ غير متوقع أثناء تحميل البيانات.');
         }
@@ -132,7 +129,7 @@ export default function AdminDashboardPage() {
         <div
           role="tablist"
           aria-label="أقسام لوحة التحكم"
-          className="flex w-full gap-1 overflow-x-auto rounded-2xl bg-gray-200/60 p-1.5 hide-scrollbar"
+          className="hide-scrollbar flex w-full gap-1 overflow-x-auto rounded-2xl bg-gray-200/60 p-1.5"
         >
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -146,7 +143,7 @@ export default function AdminDashboardPage() {
                 aria-controls={`panel-${tab.id}`}
                 id={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex min-w-[120px] flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-black transition-all outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 ${
+                className={`flex min-w-[120px] flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-black outline-none transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 ${
                   isActive
                     ? tab.id === 'analytics'
                       ? 'bg-white text-blue-600 shadow-sm'

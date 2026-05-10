@@ -5,22 +5,26 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { after } from 'next/server';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const PAYMOB_HMAC_SECRET = process.env.PAYMOB_HMAC_SECRET;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
-const WORKER_SECRET_TOKEN = process.env.WORKER_SECRET_TOKEN;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !PAYMOB_HMAC_SECRET || !APP_URL || !WORKER_SECRET_TOKEN) {
-  throw new Error('CRITICAL: Missing required environment variables for Paymob webhook processing.');
+function getRequiredEnvVar(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`CRITICAL: Missing required environment variable: ${key}`);
+  }
+  return value;
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
+function getSupabaseAdminClient() {
+  return createClient(
+    getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
+    getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
 
 interface PaymobPayload {
   readonly obj?: Record<string, unknown>;
@@ -64,6 +68,8 @@ function verifyPaymobHmac(payload: PaymobPayload, receivedHmac: string): boolean
     return false;
   }
 
+  const hmacSecret = getRequiredEnvVar('PAYMOB_HMAC_SECRET');
+
   const dataString = PAYMOB_HMAC_KEYS.map((key) => {
     const val = extractNestedValue(payload.obj as Record<string, unknown>, key);
     if (typeof val === 'boolean') {
@@ -73,7 +79,7 @@ function verifyPaymobHmac(payload: PaymobPayload, receivedHmac: string): boolean
   }).join('');
 
   const calculatedHmac = crypto
-    .createHmac('sha512', PAYMOB_HMAC_SECRET!)
+    .createHmac('sha512', hmacSecret)
     .update(dataString)
     .digest('hex');
 
@@ -93,19 +99,25 @@ function verifyPaymobHmac(payload: PaymobPayload, receivedHmac: string): boolean
 }
 
 async function triggerBackgroundWorker(transactionId: string): Promise<void> {
-  const workerUrl = new URL('/api/webhooks/paymob/worker', APP_URL!);
+  try {
+    const appUrl = getRequiredEnvVar('NEXT_PUBLIC_APP_URL');
+    const workerToken = getRequiredEnvVar('WORKER_SECRET_TOKEN');
+    const workerUrl = new URL('/api/webhooks/paymob/worker', appUrl);
 
-  fetch(workerUrl.toString(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${WORKER_SECRET_TOKEN}`,
-    },
-    body: JSON.stringify({ transactionId }),
-    keepalive: true,
-  }).catch((error) => {
-    console.error(`[Paymob Webhook] Failed to trigger background worker for tx ${transactionId}:`, error);
-  });
+    fetch(workerUrl.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${workerToken}`,
+      },
+      body: JSON.stringify({ transactionId }),
+      keepalive: true,
+    }).catch((error) => {
+      console.error(`[Paymob Webhook] Failed to trigger background worker for tx ${transactionId}:`, error);
+    });
+  } catch (error) {
+    console.error(`[Paymob Webhook] Error preparing background worker trigger for tx ${transactionId}:`, error);
+  }
 }
 
 export async function POST(req: Request) {
@@ -136,6 +148,7 @@ export async function POST(req: Request) {
     }
 
     const transactionId = String(payload.obj.id);
+    const supabaseAdmin = getSupabaseAdminClient();
 
     const { error: insertError } = await supabaseAdmin.from('payment_events').insert({
       transaction_id: transactionId,

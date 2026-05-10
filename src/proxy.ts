@@ -34,7 +34,8 @@ function getClientIp(req: NextRequest): string {
   if (realIp) {
     return realIp.trim();
   }
-  return req.ip ?? "127.0.0.1";
+  
+  return "127.0.0.1";
 }
 
 export async function proxy(req: NextRequest): Promise<NextResponse> {
