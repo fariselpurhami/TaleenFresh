@@ -3,40 +3,67 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase/client'; // لا يزال مطلوباً فقط للـ Realtime
+import { motion, AnimatePresence } from 'framer-motion';
+import { Package, ShoppingCart, BarChart3 } from 'lucide-react';
+import { supabase } from '@/lib/supabase/client';
 import OrdersClient from '@/components/admin/OrdersClient';
 import { AdminProductCard } from '@/components/admin/AdminProductCard';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Package, ShoppingCart, BarChart3 } from 'lucide-react';
-// استيراد الأسلحة الجديدة
 import { fetchAdminDashboardData } from '@/app/actions/admin-actions';
 
+type TabType = 'orders' | 'inventory' | 'analytics';
+
+export interface Order {
+  id: string;
+  [key: string]: unknown;
+}
+
+export interface Product {
+  id: string;
+  [key: string]: unknown;
+}
+
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'orders' | 'inventory' | 'analytics'>('orders');
-  const [products, setProducts] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>('orders');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    async function loadData() {
-      // استخدام الـ Server Action الآمن لجلب البيانات
-      const result = await fetchAdminDashboardData();
+    let isMounted = true;
 
-      if (result.success) {
-        setProducts(result.products!);
-        setOrders(result.orders!);
-      } else {
-        setErrorMsg('فشل تحميل البيانات. تأكد من إعدادات الـ RLS والمفاتيح.');
+    async function loadData() {
+      try {
+        const result = await fetchAdminDashboardData();
+
+        if (!isMounted) return;
+
+        if (result.success) {
+          setProducts((result.products as Product[]) || []);
+          setOrders((result.orders as Order[]) || []);
+        } else {
+          setErrorMsg('فشل تحميل البيانات. تأكد من إعدادات الـ RLS والمفاتيح.');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setErrorMsg('حدث خطأ غير متوقع أثناء تحميل البيانات.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     }
 
     loadData();
 
-    // الرادار الحي (Real-time) لا يزال يعمل بالـ ANON_KEY لأنه يراقب الأحداث فقط
-    // ولن يكسر الـ RLS إذا كان الـ Channel مسموحاً به (أو يمكنك تعطيله واستخدام Polling لو واجهت مشاكل)
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const channel = supabase
       .channel('admin-orders-realtime')
       .on(
@@ -44,11 +71,13 @@ export default function AdminDashboardPage() {
         { event: '*', schema: 'public', table: 'orders' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setOrders((prev) => [payload.new, ...prev]);
+            setOrders((prev) => [payload.new as Order, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
-            setOrders((prev) => prev.map(o => o.id === payload.new.id ? payload.new : o));
+            setOrders((prev) =>
+              prev.map((o) => (o.id === payload.new.id ? (payload.new as Order) : o))
+            );
           } else if (payload.eventType === 'DELETE') {
-            setOrders((prev) => prev.filter(o => o.id !== payload.old.id));
+            setOrders((prev) => prev.filter((o) => o.id !== payload.old.id));
           }
         }
       )
@@ -59,36 +88,77 @@ export default function AdminDashboardPage() {
     };
   }, []);
 
-  if (loading) return <div className="flex h-screen items-center justify-center font-black text-gray-400" dir="rtl">جاري تحميل غرفة العمليات...</div>;
-  if (errorMsg) return <div className="flex h-screen items-center justify-center font-black text-red-500" dir="rtl">{errorMsg}</div>;
+  if (loading) {
+    return (
+      <div
+        className="flex h-screen items-center justify-center font-black text-gray-400"
+        dir="rtl"
+        role="status"
+        aria-live="polite"
+      >
+        جاري تحميل غرفة العمليات...
+      </div>
+    );
+  }
+
+  if (errorMsg) {
+    return (
+      <div
+        className="flex h-screen items-center justify-center font-black text-red-500"
+        dir="rtl"
+        role="alert"
+      >
+        {errorMsg}
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: 'orders', label: 'الطلبات الحية', icon: ShoppingCart },
+    { id: 'inventory', label: 'إدارة المخزون', icon: Package },
+    { id: 'analytics', label: 'التحليلات الذكية', icon: BarChart3 },
+  ] as const;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col px-[calc(1rem+env(safe-area-inset-left))] pb-[calc(5rem+env(safe-area-inset-bottom))]" dir="rtl">
+    <div
+      className="mx-auto flex w-full max-w-7xl flex-col px-[calc(1rem+env(safe-area-inset-left))] pb-[calc(5rem+env(safe-area-inset-bottom))]"
+      dir="rtl"
+    >
       <header className="sticky top-0 z-50 flex w-full flex-col gap-4 bg-gray-50 pb-4 pt-[calc(1.5rem+env(safe-area-inset-top))]">
-        <h1 className="px-2 text-3xl font-black text-gray-900">غرفة العمليات</h1>
+        <h1 className="px-2 text-3xl font-black text-gray-900">
+          غرفة العمليات
+        </h1>
 
-        <div className="flex w-full gap-1 rounded-2xl bg-gray-200/60 p-1.5 overflow-x-auto hide-scrollbar">
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`flex flex-1 min-w-[120px] items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-black transition-all ${activeTab === 'orders' ? 'bg-white text-[#2C643E] shadow-sm' : 'text-gray-500 hover:bg-gray-300/50'}`}
-          >
-            <ShoppingCart size={20} />
-            الطلبات الحية
-          </button>
-          <button
-            onClick={() => setActiveTab('inventory')}
-            className={`flex flex-1 min-w-[120px] items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-black transition-all ${activeTab === 'inventory' ? 'bg-white text-[#2C643E] shadow-sm' : 'text-gray-500 hover:bg-gray-300/50'}`}
-          >
-            <Package size={20} />
-            إدارة المخزون
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex flex-1 min-w-[120px] items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-black transition-all ${activeTab === 'analytics' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-gray-300/50'}`}
-          >
-            <BarChart3 size={20} />
-            التحليلات الذكية
-          </button>
+        <div
+          role="tablist"
+          aria-label="أقسام لوحة التحكم"
+          className="flex w-full gap-1 overflow-x-auto rounded-2xl bg-gray-200/60 p-1.5 hide-scrollbar"
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`panel-${tab.id}`}
+                id={`tab-${tab.id}`}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex min-w-[120px] flex-1 items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-black transition-all outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 ${
+                  isActive
+                    ? tab.id === 'analytics'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'bg-white text-[#2C643E] shadow-sm'
+                    : 'text-gray-500 hover:bg-gray-300/50'
+                }`}
+              >
+                <Icon size={20} aria-hidden="true" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </header>
 
@@ -97,6 +167,9 @@ export default function AdminDashboardPage() {
           {activeTab === 'orders' && (
             <motion.section
               key="orders"
+              id="panel-orders"
+              role="tabpanel"
+              aria-labelledby="tab-orders"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -110,11 +183,14 @@ export default function AdminDashboardPage() {
           {activeTab === 'inventory' && (
             <motion.section
               key="inventory"
+              id="panel-inventory"
+              role="tabpanel"
+              aria-labelledby="tab-inventory"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="grid w-full grid-cols-1 gap-4 md:grid-cols-2"
+              className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
             >
               {products.map((product) => (
                 <AdminProductCard key={product.id} product={product} />
@@ -125,6 +201,9 @@ export default function AdminDashboardPage() {
           {activeTab === 'analytics' && (
             <motion.section
               key="analytics"
+              id="panel-analytics"
+              role="tabpanel"
+              aria-labelledby="tab-analytics"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}

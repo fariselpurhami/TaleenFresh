@@ -2,22 +2,21 @@
 
 import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
+
 import './globals.css';
 
-const cairo = Cairo({ 
+const cairo = Cairo({
   subsets: ['arabic', 'latin'],
-  display: 'swap', 
-  variable: '--font-cairo', 
-  weight: ['400', '500', '700', '900'], 
+  display: 'swap',
+  variable: '--font-sans',
+  weight: ['400', '500', '700', '900'],
 });
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false, 
-  viewportFit: 'cover', 
-  themeColor: '#2C643E', 
+  viewportFit: 'cover',
+  themeColor: '#2C643E',
 };
 
 export const metadata: Metadata = {
@@ -26,22 +25,18 @@ export const metadata: Metadata = {
     default: 'TaleenFresh | تالين فريش',
   },
   description: 'مُنتجات طازجة تُقطف بعناية لتصلك بأعلى جودة.',
-  manifest: '/manifest.ts', 
   applicationName: 'TaleenFresh',
-  
   appleWebApp: {
     capable: true,
     title: 'TaleenFresh',
-    statusBarStyle: 'black-translucent', 
+    statusBarStyle: 'black-translucent',
   },
-  
   formatDetection: {
-    telephone: false, 
+    telephone: false,
   },
-  
   icons: {
     icon: '/icon-512x512.png',
-    apple: '/icon-512x512.png', 
+    apple: '/icon-512x512.png',
   },
 };
 
@@ -51,11 +46,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl" className={`${cairo.variable} scroll-smooth`} suppressHydrationWarning>
-      <head>
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-      </head>
-      <body className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased selection:bg-[#2C643E]/20 selection:text-[#2C643E] bg-pattern-watermark custom-scrollbar overflow-x-hidden flex flex-col mx-auto relative shadow-2xl transition-all duration-500 ease-in-out max-w-[430px] portrait:max-w-[430px] landscape:max-w-full md:max-w-[430px] md:landscape:max-w-full"
+    <html
+      lang="ar"
+      dir="rtl"
+      className={`${cairo.variable} scroll-smooth`}
+      suppressHydrationWarning
+    >
+      <body
+        className="mx-auto flex min-h-dvh max-w-[430px] flex-col overflow-x-hidden bg-background font-sans text-foreground shadow-2xl antialiased selection:bg-primary/20 selection:text-primary bg-pattern-watermark landscape:max-w-full md:landscape:max-w-full"
         suppressHydrationWarning
       >
         {children}

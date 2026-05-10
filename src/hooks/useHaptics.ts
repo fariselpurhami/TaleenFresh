@@ -1,29 +1,38 @@
 // src/hooks/useHaptics.ts
+
 'use client';
+
 import { useCallback } from 'react';
 
-type VibrationPattern = 'light' | 'medium' | 'success' | 'error';
+export type VibrationPattern = 'light' | 'medium' | 'success' | 'error';
 
-export const useHaptics = () => {
+const VIBRATION_PATTERNS: Readonly<Record<VibrationPattern, number | number[]>> = {
+  light: 15,
+  medium: 30,
+  success: [50, 50, 100],
+  error: [50, 100, 50, 100],
+};
+
+export interface UseHapticsReturn {
+  trigger: (pattern: VibrationPattern) => void;
+}
+
+export function useHaptics(): UseHapticsReturn {
   const trigger = useCallback((pattern: VibrationPattern) => {
-    
-    if (typeof window === 'undefined' || !navigator.vibrate) return;
+    if (
+      typeof window === 'undefined' ||
+      typeof navigator === 'undefined' ||
+      typeof navigator.vibrate !== 'function'
+    ) {
+      return;
+    }
 
-    switch (pattern) {
-      case 'light':
-        navigator.vibrate(15); 
-        break;
-      case 'medium':
-        navigator.vibrate(30); 
-        break;
-      case 'success':
-        navigator.vibrate([50, 50, 100]); 
-        break;
-      case 'error':
-        navigator.vibrate([50, 100, 50, 100]); 
-        break;
+    try {
+      navigator.vibrate(VIBRATION_PATTERNS[pattern]);
+    } catch {
+      return;
     }
   }, []);
 
   return { trigger };
-};
+}

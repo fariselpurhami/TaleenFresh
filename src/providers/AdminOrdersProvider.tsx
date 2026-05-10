@@ -1,73 +1,157 @@
 // src/providers/AdminOrdersProvider.tsx
+
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react';
 import { supabase } from '@/lib/supabase/client';
 
-interface AdminOrdersContextType {
-  orders: any[];
-  newOrder: any | null;
+export interface Order {
+  id: string;
+  status: string;
+  [key: string]: unknown;
+}
+
+export interface AdminOrdersContextType {
+  orders: Order[];
+  newOrder: Order | null;
   updateOrderStatus: (id: string, status: string) => Promise<void>;
   clearNewOrder: () => void;
 }
 
 const AdminOrdersContext = createContext<AdminOrdersContextType | undefined>(undefined);
 
-export function AdminOrdersProvider({ children, initialOrders }: { children: ReactNode, initialOrders: any[] }) {
-  const [orders, setOrders] = useState(initialOrders);
-  const [newOrder, setNewOrder] = useState<any | null>(null);
-  
+interface AdminOrdersProviderProps {
+  children: ReactNode;
+  initialOrders: Order[];
+}
+
+export function AdminOrdersProvider({ children, initialOrders }: AdminOrdersProviderProps) {
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [newOrder, setNewOrder] = useState<Order | null>(null);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    audioRef.current = new Audio('/notification.mp3');
-    
+    let isMounted = true;
+
+    if (typeof window !== 'undefined') {
+      audioRef.current = new Audio('/notification.mp3');
+    }
+
     const channel = supabase
       .channel('admin-global-orders')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        const insertedOrder = payload.new;
-        setOrders((current) => [insertedOrder, ...current]);
-        setNewOrder(insertedOrder);
-        
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch(e => console.warn('Audio blocked by browser:', e));
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (!isMounted) return;
+
+          const insertedOrder = payload.new as Order;
+          setOrders((current) => [insertedOrder, ...current]);
+          setNewOrder(insertedOrder);
+
+          if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(() => {
+            });
+          }
         }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-        const updatedOrder = payload.new;
-        setOrders((current) => current.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)));
-      })
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (!isMounted) return;
+
+          const updatedOrder = payload.new as Order;
+          setOrders((current) =>
+            current.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+          );
+        }
+      )
       .subscribe();
 
     return () => {
+      isMounted = false;
       supabase.removeChannel(channel);
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute('src');
+        audioRef.current.load();
+        audioRef.current = null;
+      }
     };
   }, []);
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = useCallback(async (orderId: string, newStatus: string) => {
+    let originalStatus = '';
 
-    const prevOrders = [...orders];
-    setOrders((current) => current.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
-    
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-    if (error) {
-      console.error('Failed to update status:', error);
-      setOrders(prevOrders); 
+    setOrders((current) =>
+      current.map((o) => {
+        if (o.id === orderId) {
+          originalStatus = o.status;
+          return { ...o, status: newStatus };
+        }
+        return o;
+      })
+    );
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      setOrders((current) =>
+        current.map((o) =>
+          o.id === orderId && originalStatus ? { ...o, status: originalStatus } : o
+        )
+      );
+      throw error;
     }
-  };
+  }, []);
 
-  const clearNewOrder = () => setNewOrder(null);
+  const clearNewOrder = useCallback(() => {
+    setNewOrder(null);
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({
+      orders,
+      newOrder,
+      updateOrderStatus,
+      clearNewOrder,
+    }),
+    [orders, newOrder, updateOrderStatus, clearNewOrder]
+  );
 
   return (
-    <AdminOrdersContext.Provider value={{ orders, newOrder, updateOrderStatus, clearNewOrder }}>
+    <AdminOrdersContext.Provider value={contextValue}>
       {children}
     </AdminOrdersContext.Provider>
   );
 }
 
-export const useAdminOrders = () => {
+export const useAdminOrders = (): AdminOrdersContextType => {
   const context = useContext(AdminOrdersContext);
-  if (!context) throw new Error("useAdminOrders must be used within AdminOrdersProvider");
+
+  if (context === undefined) {
+    throw new Error('useAdminOrders must be used within an AdminOrdersProvider');
+  }
+
   return context;
 };
