@@ -1,215 +1,222 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+// src/app/api/checkout/route.ts
+
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const PAYMOB_API_KEY = process.env.PAYMOB_API_KEY;
+const PAYMOB_INTEGRATION_ID = process.env.PAYMOB_INTEGRATION_ID;
+const PAYMOB_IFRAME_ID = process.env.PAYMOB_IFRAME_ID;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('CRITICAL: Missing Supabase environment variables');
+}
+
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
+
+interface CartItem {
+  readonly name: string;
+  readonly qty: number;
+  readonly price: number;
+}
+
+interface CheckoutPayload {
+  readonly customer_name: string;
+  readonly customer_phone: string;
+  readonly customer_address: string;
+  readonly items: readonly CartItem[];
+  readonly total_price: number;
+  readonly payment_method: 'card' | 'cod';
+}
+
+function isValidCheckoutPayload(payload: unknown): payload is CheckoutPayload {
+  if (!payload || typeof payload !== 'object') return false;
+
+  const p = payload as Record<string, unknown>;
+
+  if (typeof p.customer_name !== 'string' || !p.customer_name.trim()) return false;
+  if (typeof p.customer_phone !== 'string' || !p.customer_phone.trim()) return false;
+  if (typeof p.customer_address !== 'string' || !p.customer_address.trim()) return false;
+  if (typeof p.total_price !== 'number' || p.total_price < 0 || isNaN(p.total_price)) return false;
+  if (p.payment_method !== 'card' && p.payment_method !== 'cod') return false;
+
+  if (!Array.isArray(p.items) || p.items.length === 0) return false;
+
+  for (const item of p.items) {
+    if (!item || typeof item !== 'object') return false;
+    if (typeof item.name !== 'string' || !item.name.trim()) return false;
+    if (typeof item.qty !== 'number' || item.qty <= 0 || !Number.isInteger(item.qty)) return false;
+    if (typeof item.price !== 'number' || item.price < 0 || isNaN(item.price)) return false;
+  }
+
+  return true;
+}
+
+async function handlePaymobOrchestration(
+  orderId: string,
+  amount: number,
+  customer: { firstName: string; lastName: string; phone: string; address: string }
+): Promise<string> {
+  if (!PAYMOB_API_KEY || !PAYMOB_INTEGRATION_ID || !PAYMOB_IFRAME_ID) {
+    throw new Error('Missing Paymob environment variables');
+  }
+
+  const amountCents = Math.round(amount * 100);
+
+  const authRes = await fetch('https://accept.paymob.com/api/auth/tokens', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: PAYMOB_API_KEY }),
+    cache: 'no-store',
+  });
+
+  if (!authRes.ok) {
+    const errData = await authRes.text();
+    throw new Error(`Paymob auth failed: ${errData}`);
+  }
+
+  const { token: authToken } = await authRes.json() as { token: string };
+
+  const orderRes = await fetch('https://accept.paymob.com/api/ecommerce/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      auth_token: authToken,
+      delivery_needed: false,
+      amount_cents: amountCents,
+      currency: 'EGP',
+      merchant_order_id: orderId,
+      items: [],
+    }),
+    cache: 'no-store',
+  });
+
+  if (!orderRes.ok) {
+    const errData = await orderRes.text();
+    throw new Error(`Paymob order registration failed: ${errData}`);
+  }
+
+  const { id: paymobOrderId } = await orderRes.json() as { id: number };
+
+  const paymentKeyRes = await fetch('https://accept.paymob.com/api/acceptance/payment_keys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      auth_token: authToken,
+      amount_cents: amountCents,
+      expiration: 3600,
+      order_id: paymobOrderId,
+      billing_data: {
+        apartment: 'NA',
+        email: 'checkout@taleenfresh.com',
+        floor: 'NA',
+        first_name: customer.firstName,
+        street: customer.address,
+        building: 'NA',
+        phone_number: customer.phone,
+        shipping_method: 'NA',
+        postal_code: 'NA',
+        city: 'Cairo',
+        country: 'EG',
+        last_name: customer.lastName,
+        state: 'Cairo',
+      },
+      currency: 'EGP',
+      integration_id: Number(PAYMOB_INTEGRATION_ID),
+    }),
+    cache: 'no-store',
+  });
+
+  if (!paymentKeyRes.ok) {
+    const errData = await paymentKeyRes.text();
+    throw new Error(`Paymob payment key generation failed: ${errData}`);
+  }
+
+  const { token: paymentToken } = await paymentKeyRes.json() as { token: string };
+
+  return `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentToken}`;
+}
 
 export async function POST(req: Request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const paymobApiKey = process.env.PAYMOB_API_KEY
-    const paymobIntegrationId = process.env.PAYMOB_INTEGRATION_ID
-    const paymobIframeId = process.env.PAYMOB_IFRAME_ID
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json(
-        { error: 'Missing Supabase environment variables' },
-        { status: 500 }
-      )
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return NextResponse.json({ error: 'Unsupported Media Type' }, { status: 415 });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false
-      }
-    })
-
-    const body = await req.json()
-
-    const {
-      customer_name,
-      customer_phone,
-      customer_address,
-      items,
-      total_price,
-      payment_method
-    } = body
-
-    if (!customer_name || !customer_phone || !customer_address) {
-      return NextResponse.json(
-        { error: 'Missing customer details' },
-        { status: 400 }
-      )
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: 'Cart cannot be empty' },
-        { status: 400 }
-      )
+    if (!isValidCheckoutPayload(rawBody)) {
+      return NextResponse.json({ error: 'Invalid or missing checkout fields' }, { status: 400 });
     }
 
-    const normalizedPaymentMethod = payment_method === 'card' ? 'card' : 'cod'
+    const payload = rawBody;
 
     const orderData = {
-      customer_name: String(customer_name).trim(),
-      customer_phone: String(customer_phone).trim(),
-      customer_address: String(customer_address).trim(),
-      items: items.map((item: any) => ({
-        name: String(item.name).trim(),
-        qty: Number(item.qty),
-        price: Number(item.price)
+      customer_name: payload.customer_name.trim(),
+      customer_phone: payload.customer_phone.trim(),
+      customer_address: payload.customer_address.trim(),
+      items: payload.items.map((item) => ({
+        name: item.name.trim(),
+        qty: item.qty,
+        price: item.price,
       })),
-      total_price: Number(total_price),
+      total_price: payload.total_price,
       status: 'pending',
-      payment_method: normalizedPaymentMethod
-    }
+      payment_method: payload.payment_method,
+    };
 
     const { data: insertedOrder, error: insertError } = await supabaseAdmin
       .from('orders')
       .insert([orderData])
       .select('id')
-      .single()
+      .single();
 
     if (insertError || !insertedOrder) {
-      return NextResponse.json(
+      console.error('[Checkout Route] Database insert failed:', insertError);
+      return NextResponse.json({ error: 'Failed to create order in database' }, { status: 500 });
+    }
+
+    if (payload.payment_method === 'cod') {
+      return NextResponse.json({ success: true, orderId: insertedOrder.id }, { status: 201 });
+    }
+
+    const nameParts = payload.customer_name.trim().split(' ').filter(Boolean);
+    const firstName = nameParts[0] || 'Customer';
+    const lastName = nameParts.slice(1).join(' ') || 'Customer';
+
+    try {
+      const paymentUrl = await handlePaymobOrchestration(
+        insertedOrder.id,
+        payload.total_price,
         {
-          error: 'Database transaction failed',
-          code: insertError?.code,
-          message: insertError?.message,
-          details: insertError?.details,
-          hint: insertError?.hint
-        },
-        { status: 500 }
-      )
+          firstName,
+          lastName,
+          phone: payload.customer_phone.trim(),
+          address: payload.customer_address.trim() || 'NA'
+        }
+      );
+
+      return NextResponse.json({ success: true, orderId: insertedOrder.id, url: paymentUrl }, { status: 201 });
+    } catch (paymobError) {
+      console.error('[Checkout Route] Paymob orchestration failed:', paymobError);
+      return NextResponse.json({ error: 'Payment gateway integration failed' }, { status: 502 });
     }
 
-    if (normalizedPaymentMethod === 'cod') {
-      return NextResponse.json(
-        {
-          success: true,
-          orderId: insertedOrder.id
-        },
-        { status: 201 }
-      )
-    }
-
-    if (!paymobApiKey || !paymobIntegrationId || !paymobIframeId) {
-      return NextResponse.json(
-        { error: 'Missing Paymob environment variables' },
-        { status: 500 }
-      )
-    }
-
-    const amountCents = Math.round(Number(total_price) * 100)
-
-    const authRes = await fetch('https://accept.paymob.com/api/auth/tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: paymobApiKey
-      })
-    })
-
-    const authData = await authRes.json()
-
-    if (!authRes.ok || !authData?.token) {
-      return NextResponse.json(
-        {
-          error: 'Paymob auth failed',
-          details: authData
-        },
-        { status: 502 }
-      )
-    }
-
-    const paymobOrderRes = await fetch('https://accept.paymob.com/api/ecommerce/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        auth_token: authData.token,
-        delivery_needed: false,
-        amount_cents: amountCents,
-        currency: 'EGP',
-        merchant_order_id: insertedOrder.id,
-        items: []
-      })
-    })
-
-    const paymobOrderData = await paymobOrderRes.json()
-
-    if (!paymobOrderRes.ok || !paymobOrderData?.id) {
-      return NextResponse.json(
-        {
-          error: 'Paymob order registration failed',
-          details: paymobOrderData
-        },
-        { status: 502 }
-      )
-    }
-
-    const fullName = String(customer_name).trim()
-    const nameParts = fullName.split(' ').filter(Boolean)
-    const firstName = nameParts[0] || 'Customer'
-    const lastName = nameParts.slice(1).join(' ') || 'Customer'
-
-    const paymentKeyRes = await fetch('https://accept.paymob.com/api/acceptance/payment_keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        auth_token: authData.token,
-        amount_cents: amountCents,
-        expiration: 3600,
-        order_id: paymobOrderData.id,
-        billing_data: {
-          apartment: 'NA',
-          email: 'checkout@taleenfresh.com',
-          floor: 'NA',
-          first_name: firstName,
-          street: String(customer_address).trim() || 'NA',
-          building: 'NA',
-          phone_number: String(customer_phone).trim(),
-          shipping_method: 'NA',
-          postal_code: 'NA',
-          city: 'Cairo',
-          country: 'EG',
-          last_name: lastName,
-          state: 'Cairo'
-        },
-        currency: 'EGP',
-        integration_id: Number(paymobIntegrationId)
-      })
-    })
-
-    const paymentKeyData = await paymentKeyRes.json()
-
-    if (!paymentKeyRes.ok || !paymentKeyData?.token) {
-      return NextResponse.json(
-        {
-          error: 'Paymob payment key generation failed',
-          details: paymentKeyData
-        },
-        { status: 502 }
-      )
-    }
-
-    const url = `https://accept.paymob.com/api/acceptance/iframes/${paymobIframeId}?payment_token=${paymentKeyData.token}`
-
-    return NextResponse.json(
-      {
-        success: true,
-        orderId: insertedOrder.id,
-        url
-      },
-      { status: 201 }
-    )
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: 'Internal server error processing checkout',
-        message: error?.message ?? 'Unknown error'
-      },
-      { status: 500 }
-    )
+  } catch (error) {
+    console.error('[Checkout Route] Unhandled exception:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
