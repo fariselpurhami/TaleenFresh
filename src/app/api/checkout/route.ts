@@ -5,23 +5,17 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const PAYMOB_API_KEY = process.env.PAYMOB_API_KEY;
-const PAYMOB_INTEGRATION_ID = process.env.PAYMOB_INTEGRATION_ID;
-const PAYMOB_IFRAME_ID = process.env.PAYMOB_IFRAME_ID;
+import { env } from '@/lib/env';
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('CRITICAL: Missing Supabase environment variables');
-}
-
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false,
-  },
-});
+const getSupabaseAdmin = () => {
+  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+};
 
 interface CartItem {
   readonly name: string;
@@ -66,8 +60,8 @@ async function handlePaymobOrchestration(
   amount: number,
   customer: { firstName: string; lastName: string; phone: string; address: string }
 ): Promise<string> {
-  if (!PAYMOB_API_KEY || !PAYMOB_INTEGRATION_ID || !PAYMOB_IFRAME_ID) {
-    throw new Error('Missing Paymob environment variables');
+  if (!env.PAYMOB_API_KEY || !env.PAYMOB_INTEGRATION_ID || !env.PAYMOB_IFRAME_ID) {
+    throw new Error('Missing Paymob environment variables in env.ts');
   }
 
   const amountCents = Math.round(amount * 100);
@@ -75,7 +69,7 @@ async function handlePaymobOrchestration(
   const authRes = await fetch('https://accept.paymob.com/api/auth/tokens', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_key: PAYMOB_API_KEY }),
+    body: JSON.stringify({ api_key: env.PAYMOB_API_KEY }),
     cache: 'no-store',
   });
 
@@ -131,7 +125,7 @@ async function handlePaymobOrchestration(
         state: 'Cairo',
       },
       currency: 'EGP',
-      integration_id: Number(PAYMOB_INTEGRATION_ID),
+      integration_id: Number(env.PAYMOB_INTEGRATION_ID),
     }),
     cache: 'no-store',
   });
@@ -179,6 +173,8 @@ export async function POST(req: Request) {
       status: 'pending',
       payment_method: payload.payment_method,
     };
+
+    const supabaseAdmin = getSupabaseAdmin();
 
     const { data: insertedOrder, error: insertError } = await supabaseAdmin
       .from('orders')
