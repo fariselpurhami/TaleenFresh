@@ -264,7 +264,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                           className="font-mono text-sm font-bold tracking-wide text-gray-900 hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                           dir="ltr"
                         >
-                          {order.customer_phone}
+                          {order.customer_phone.replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d).toString())}
                         </a>
                       </div>
                     </div>
