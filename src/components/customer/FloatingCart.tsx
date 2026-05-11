@@ -266,7 +266,9 @@ export function FloatingCart() {
             animate={{ y: 0, x: '-50%' }}
             exit={{ y: '100%', x: '-50%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
-            className="fixed bottom-0 left-[50%] z-[70] flex h-auto w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none sm:max-h-[80vh] max-h-[80vh]"
+            className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none transition-all duration-300 ${
+  paymentUrl ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh] sm:max-h-[80vh]'
+}`}
           >
             <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-6 py-4">
               <div className="flex items-center gap-2 text-xl font-bold text-gray-800">
@@ -299,11 +301,18 @@ export function FloatingCart() {
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="relative h-[70vh] w-full flex-1 bg-gray-50"
+                className="relative flex-1 w-full min-h-[78vh] bg-white"
               >
+	       <div className="absolute inset-0 flex items-center justify-center bg-[#f8fafc]">
+                 <div className="flex flex-col items-center gap-3">
+                   <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#2C643E] border-t-transparent" />
+                   <p className="text-sm font-bold text-gray-500">جاري تحميل شاشة الدفع...</p>
+                 </div>
+                </div>
+
                 <iframe
                   src={paymentUrl}
-                  className="absolute inset-0 h-full w-full border-none"
+                  className="absolute inset-0 z-10 h-full w-full border-none bg-transparent"
                   allow="payment"
                 />
               </motion.div>
