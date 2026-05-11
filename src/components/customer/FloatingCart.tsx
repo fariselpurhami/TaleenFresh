@@ -301,7 +301,7 @@ export function FloatingCart() {
             exit={{ y: '100%', x: '-50%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
             className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none transition-all duration-500 ${
-              paymentUrl || isPaymentFailed || isOrdered ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh] sm:max-h-[80vh]'
+              paymentUrl || isPaymentFailed ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh]'
             }`}
           >
             <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-6 py-4">
@@ -401,7 +401,7 @@ export function FloatingCart() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.3 }}
-                    className="flex flex-1 w-full flex-col items-center justify-center bg-white p-6 text-center"
+                    className="flex w-full flex-col items-center justify-center bg-white p-10 text-center"
                   >
                     <motion.div
                       initial={{ scale: 0 }}
