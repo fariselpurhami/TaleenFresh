@@ -137,7 +137,7 @@ async function handlePaymobOrchestration(
 
   const { token: paymentToken } = await paymentKeyRes.json() as { token: string };
 
-  return `https://accept.paymob.com/api/acceptance/iframes/${PAYMOB_IFRAME_ID}?payment_token=${paymentToken}`;
+  return `https://accept.paymob.com/api/acceptance/iframes/${env.PAYMOB_IFRAME_ID}?payment_token=${paymentToken}`;
 }
 
 export async function POST(req: Request) {
