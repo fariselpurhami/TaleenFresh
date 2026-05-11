@@ -33,6 +33,7 @@ export function FloatingCart() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod')
   const { customerInfo, setCustomerInfo } = useCheckout()
   const [showScrollArrow, setShowScrollArrow] = useState(false)
+  const [isPaymentFailed, setIsPaymentFailed] = useState(false)
 
   const items = useCart((state) => state.items)
   const updateQty = useCart((state) => state.updateQty)
@@ -49,12 +50,13 @@ export function FloatingCart() {
   const DELIVERY_FEE = 25
   const finalTotal = cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0
   const isFormIncomplete = !customerInfo.fullName || !customerInfo.phone || !customerInfo.address
-
+  
   const resetCheckoutState = () => {
     setIsSubmitting(false)
     setIsOrdered(false)
     setPaymentUrl(null)
     setErrorMsg('')
+    setIsPaymentFailed(false)
   }
 
   const resetCustomerState = () => {
@@ -149,6 +151,7 @@ export function FloatingCart() {
         } else {
           setPaymentUrl(null);
           setIsSubmitting(false);
+	  setIsPaymentFailed(true);
           setErrorMsg('عذراً، فشلت عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار الدفع عند الاستلام.');
           trigger('error');
         }
@@ -276,7 +279,7 @@ export function FloatingCart() {
   }
 
   if (!isMounted || !_hasHydrated) return null
-
+  
   return (
     <AnimatePresence>
       {isOpen && (
@@ -287,30 +290,36 @@ export function FloatingCart() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
-            onClick={() => !isSubmitting && setIsOpen(false)}
+            onClick={() => setIsOpen(false)}
             className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
           />
 
           <motion.div
-	    data-testid="cart-container"
+            data-testid="cart-container"
             initial={{ y: '100%', x: '-50%' }}
             animate={{ y: 0, x: '-50%' }}
             exit={{ y: '100%', x: '-50%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
-            className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none transition-all duration-300 ${
-  paymentUrl ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh] sm:max-h-[80vh]'
-}`}
+            className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none transition-all duration-500 ${
+              paymentUrl || isPaymentFailed || isOrdered ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh] sm:max-h-[80vh]'
+            }`}
           >
             <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-6 py-4">
               <div className="flex items-center gap-2 text-xl font-bold text-gray-800">
-                {paymentUrl ? (
+                {paymentUrl || isPaymentFailed ? (
                   <button
-                    onClick={() => setPaymentUrl(null)}
+                    onClick={() => {
+                      setPaymentUrl(null);
+                      setIsPaymentFailed(false);
+                      setIsSubmitting(false);
+                    }}
                     className="flex items-center gap-2 text-gray-600 transition-colors hover:text-gray-900"
                   >
                     <ArrowRight className="h-5 w-5" />
                     رجوع
                   </button>
+                ) : isOrdered ? (
+                  <span className="text-[#2C643E]">الطلب مكتمل</span>
                 ) : (
                   <>
                     <ShoppingBag className="h-6 w-6 text-[#2C643E]" />
@@ -320,240 +329,300 @@ export function FloatingCart() {
               </div>
 
               <button
-                onClick={() => !isSubmitting && setIsOpen(false)}
-                disabled={isSubmitting}
-                className="rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200 disabled:opacity-50"
+                onClick={() => setIsOpen(false)}
+                className="rounded-full bg-gray-100 p-2 text-gray-500 transition-colors hover:bg-gray-200"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {paymentUrl ? (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="relative flex-1 w-full min-h-[78vh] bg-white"
-              >
-	       <div className="absolute inset-0 flex items-center justify-center bg-[#f8fafc]">
-                 <div className="flex flex-col items-center gap-3">
-                   <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#2C643E] border-t-transparent" />
-                   <p className="text-sm font-bold text-gray-500">جاري تحميل شاشة الدفع...</p>
-                 </div>
-                </div>
-
-                <iframe
-                  src={paymentUrl}
-                  className="absolute inset-0 z-10 h-full w-full border-none bg-transparent"
-                  allow="payment"
-                />
-              </motion.div>
-            ) : (
-              <>
-                <div
-                  ref={scrollContainerRef}
-                  onScroll={checkScrollState}
-                  className="custom-scrollbar relative flex-1 overflow-y-auto px-6 pb-12 pt-4"
-                >
-                  {isOrdered ? (
-                    <div data-testid="order-success-view" className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
-                      <CheckCircle2 className="h-20 w-20 text-green-500" />
-                      <h3 className="text-2xl font-bold text-gray-800">تم استلام طلبك!</h3>
-                      <p data-testid="order-success-message" className="text-gray-500">جاري التجهيز الآن يا {customerInfo.fullName.split(' ')[0]}</p>
-                    </div>
-                  ) : items.length === 0 ? (
-                    <div className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
-                      <div className="rounded-full bg-gray-50 p-6">
-                        <ShoppingBag className="h-16 w-16 text-gray-300" />
+            <div className="relative flex flex-1 flex-col overflow-hidden bg-white min-h-0">
+              <AnimatePresence mode="wait">
+                
+                {paymentUrl ? (
+                  <motion.div
+                    key="iframe-view"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative flex-1 w-full bg-white overflow-hidden p-0"
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#f8fafc]">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#2C643E] border-t-transparent" />
+                        <p className="text-sm font-bold text-gray-500">جاري تحميل بوابة الدفع...</p>
                       </div>
-                      <h3 className="text-xl font-bold text-gray-800">سلتك فارغة</h3>
-                      <p className="text-gray-500">لم تقم بإضافة أي منتجات حتى الآن.</p>
-                      <button
-                        onClick={() => setIsOpen(false)}
-                        className="mt-4 w-full rounded-2xl bg-gray-100 px-8 py-4 font-black text-gray-700 transition-all hover:bg-gray-200 active:scale-[0.98]"
-                      >
-                        ابدأ التسوق
-                      </button>
                     </div>
-                  ) : (
-                    <>
-                      <div className="space-y-3">
-                        {items.map((item) => {
-                          const isGrapeLeaves = item.name.includes('عنب')
-                          const unit = (item as any).category === 'leaf_greens' && !isGrapeLeaves ? 'حزمة' : 'كجم'
-			  const step = unit === 'حزمة' ? 1 : 0.5;
-                          const minQty = unit === 'حزمة' ? 1 : 0.5;
+                    <iframe
+                      src={paymentUrl}
+                      className="relative z-10 h-full w-full border-none m-0 p-0 block"
+		      style={{ height: '100%', width: '100%', marginTop: '-5px' }}
+                      allow="payment"
+                    />
+                  </motion.div>
 
-                          return (
-                            <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
-                              <div className="flex min-w-0 flex-1 items-center gap-2">
-                                <h4 className="truncate text-sm font-bold text-gray-800">{item.name}</h4>
-                                <span className="shrink-0 rounded-md bg-green-50 px-2 py-0.5 text-xs font-bold text-[#2C643E]">
-                                  {(item.price * item.qty).toFixed(2)} ج.م
-                                </span>
-                              </div>
+                ) : isPaymentFailed ? (
+                  <motion.div
+                    key="failure-view"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-1 w-full flex-col items-center justify-center bg-white p-6 text-center"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
+                      className="mb-6 rounded-full bg-red-50 p-6"
+                    >
+                      <X className="h-16 w-16 text-red-500" strokeWidth={2} />
+                    </motion.div>
+                    <h3 className="mb-3 text-2xl font-bold text-gray-800">فشلت عملية الدفع</h3>
+                    <p className="mb-10 text-sm font-medium text-gray-500 max-w-[280px]">
+                      عذراً، لم نتمكن من إتمام عملية الدفع. يرجى التحقق من بيانات البطاقة أو المحاولة باختيار طريقة الدفع عند الاستلام.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setIsPaymentFailed(false);
+                        setIsSubmitting(false);
+                      }}
+                      className="w-full max-w-[250px] rounded-2xl bg-gray-100 px-6 py-4 text-base font-black text-gray-800 transition-all hover:bg-gray-200 active:scale-95"
+                    >
+                      العودة للمحاولة
+                    </button>
+                  </motion.div>
 
-                              <div className="flex shrink-0 items-center gap-2" dir="ltr">
-                                <div className="flex items-center gap-1 rounded-lg border bg-gray-50 p-0.5">
-                                  <button
-                                    onClick={() => updateQty(item.id, Math.max(minQty, item.qty - step))}
-                                    className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-gray-200"
-                                  >
-                                    <Minus className="h-3.5 w-3.5" />
-                                  </button>
-                                  <span className="w-14 text-center text-sm font-bold text-gray-700">
-                                    {item.qty} {unit}
-                                  </span>
-                                  <button
-                                    onClick={() => updateQty(item.id, item.qty + step)}
-                                    className="rounded-md bg-white p-1.5 text-[#2C643E] shadow-sm transition-colors hover:bg-green-50"
-                                  >
-                                    <Plus className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
+                ) : isOrdered ? (
+                  <motion.div
+                    key="success-view"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-1 w-full flex-col items-center justify-center bg-white p-6 text-center"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
+                    >
+                      <CheckCircle2 className="mb-6 h-24 w-24 text-green-500" strokeWidth={1.5} />
+                    </motion.div>
+                    <h3 className="mb-2 text-2xl font-bold text-gray-800">تم استلام طلبك!</h3>
+                    <p className="font-medium text-gray-500">جاري التجهيز الآن يا {customerInfo.fullName.split(' ')[0]}</p>
+                  </motion.div>
 
-                                <button
-                                  onClick={() => removeItem(item.id)}
-                                  className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      <div id="delivery-form" className="mt-6 space-y-4 border-t pt-6">
-                        {errorMsg && (
-                          <div
-                            className="rounded-xl border border-red-100 bg-red-50 p-3 text-right text-sm font-bold text-red-600"
-                            dir="rtl"
-                          >
-                            {errorMsg}
+                ) : (
+                  <motion.div
+                    key="cart-view"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-1 w-full flex-col min-h-0"
+                  >
+                    <div
+                      ref={scrollContainerRef}
+                      onScroll={checkScrollState}
+                      className="custom-scrollbar relative flex-1 overflow-y-auto px-6 pb-12 pt-4"
+                    >
+                      {items.length === 0 ? (
+                        <div className="flex h-full flex-col items-center justify-center space-y-4 py-10 text-center">
+                          <div className="rounded-full bg-gray-50 p-6">
+                            <ShoppingBag className="h-16 w-16 text-gray-300" />
                           </div>
-                        )}
-
-                        <h3 className="w-full text-center text-lg font-bold text-gray-800">
-                          الرجاء إدخال بياناتك
-                        </h3>
-
-                        <input
-			  data-testid="input-customer-name"
-                          type="text"
-                          placeholder="الاسم الثلاثي"
-                          value={customerInfo.fullName}
-                          onChange={(e) => setCustomerInfo({ fullName: e.target.value })}
-                          disabled={isSubmitting}
-                          className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
-                          dir="rtl"
-                        />
-
-                        <input
-			  data-testid="input-customer-phone"
-                          type="tel"
-                          placeholder="رقم الهاتف"
-                          value={customerInfo.phone}
-                          onChange={(e) => setCustomerInfo({ phone: e.target.value })}
-                          disabled={isSubmitting}
-                          className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
-                          dir="rtl"
-                        />
-
-                        <textarea
-			  data-testid="input-customer-address"
-                          ref={addressRef}
-                          rows={1}
-                          placeholder="العنوان بالتفصيل (المنطقة، الشارع، العمارة)"
-                          value={customerInfo.address}
-                          onChange={(e) => setCustomerInfo({ address: e.target.value })}
-                          disabled={isSubmitting}
-                          className="max-h-[120px] w-full resize-none overflow-y-auto rounded-xl border bg-gray-50 px-4 py-3 text-right leading-relaxed outline-none focus:border-[#2C643E] focus:bg-white"
-                          dir="rtl"
-                        />
-                      </div>
-
-                      <div className="mb-2 mt-6 space-y-4 border-t pt-6">
-                        <h3 className="w-full text-center text-lg font-bold text-gray-800">طريقة الدفع</h3>
-                        <div className="grid grid-cols-2 gap-3" dir="rtl">
+                          <h3 className="text-xl font-bold text-gray-800">سلتك فارغة</h3>
+                          <p className="text-gray-500">لم تقم بإضافة أي منتجات حتى الآن.</p>
                           <button
-                            onClick={() => setPaymentMethod('card')}
-                            disabled={isSubmitting}
-                            className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
-                              paymentMethod === 'card'
-                                ? 'border-[#2C643E] bg-green-50 text-[#2C643E]'
-                                : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
-                            }`}
+                            onClick={() => setIsOpen(false)}
+                            className="mt-4 w-full rounded-2xl bg-gray-100 px-8 py-4 font-black text-gray-700 transition-all hover:bg-gray-200 active:scale-[0.98]"
                           >
-                            <CreditCard className="h-6 w-6" />
-                            <span className="text-sm font-bold">بطاقة بنكية</span>
-                          </button>
-
-                          <button
-                            onClick={() => setPaymentMethod('cod')}
-                            disabled={isSubmitting}
-                            className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
-                              paymentMethod === 'cod'
-                                ? 'border-[#2C643E] bg-green-50 text-[#2C643E]'
-                                : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
-                            }`}
-                          >
-                            <Banknote className="h-6 w-6" />
-                            <span className="text-sm font-bold">عند الاستلام</span>
+                            ابدأ التسوق
                           </button>
                         </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                      ) : (
+                        <>
+                          <div className="space-y-3">
+                            {items.map((item) => {
+                              const isGrapeLeaves = item.name.includes('عنب')
+                              const unit = (item as any).category === 'leaf_greens' && !isGrapeLeaves ? 'حزمة' : 'كجم'
+                              const step = unit === 'حزمة' ? 1 : 0.5
+                              const minQty = unit === 'حزمة' ? 1 : 0.5
 
-                {!isOrdered && items.length > 0 && (
-                  <div className="relative shrink-0 border-t bg-white pb-safe px-6 py-4">
-                    <AnimatePresence>
-                      {showScrollArrow && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          className="absolute -top-12 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-sm"
-                        >
-                          مرر لإستكمال الدفع
-                          <ChevronsDown className="h-4 w-4 animate-bounce" />
-                        </motion.div>
+                              return (
+                                <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border p-3">
+                                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                                    <h4 className="truncate text-sm font-bold text-gray-800">{item.name}</h4>
+                                    <span className="shrink-0 rounded-md bg-green-50 px-2 py-0.5 text-xs font-bold text-[#2C643E]">
+                                      {(item.price * item.qty).toFixed(2)} ج.م
+                                    </span>
+                                  </div>
+
+                                  <div className="flex shrink-0 items-center gap-2" dir="ltr">
+                                    <div className="flex items-center gap-1 rounded-lg border bg-gray-50 p-0.5">
+                                      <button
+                                        onClick={() => updateQty(item.id, Math.max(minQty, item.qty - step))}
+                                        className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-gray-200"
+                                      >
+                                        <Minus className="h-3.5 w-3.5" />
+                                      </button>
+                                      <span className="w-14 text-center text-sm font-bold text-gray-700">
+                                        {item.qty} {unit}
+                                      </span>
+                                      <button
+                                        onClick={() => updateQty(item.id, item.qty + step)}
+                                        className="rounded-md bg-white p-1.5 text-[#2C643E] shadow-sm transition-colors hover:bg-green-50"
+                                      >
+                                        <Plus className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                    <button
+                                      onClick={() => removeItem(item.id)}
+                                      className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          <div id="delivery-form" className="mt-6 space-y-4 border-t pt-6">
+                            {errorMsg && (
+                              <div
+                                className="rounded-xl border border-red-100 bg-red-50 p-3 text-right text-sm font-bold text-red-600"
+                                dir="rtl"
+                              >
+                                {errorMsg}
+                              </div>
+                            )}
+
+                            <h3 className="w-full text-center text-lg font-bold text-gray-800">
+                              الرجاء إدخال بياناتك
+                            </h3>
+
+                            <input
+                              data-testid="input-customer-name"
+                              type="text"
+                              placeholder="الاسم الثلاثي"
+                              value={customerInfo.fullName}
+                              onChange={(e) => setCustomerInfo({ fullName: e.target.value })}
+                              disabled={isSubmitting}
+                              className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
+                              dir="rtl"
+                            />
+
+                            <input
+                              data-testid="input-customer-phone"
+                              type="tel"
+                              placeholder="رقم الهاتف"
+                              value={customerInfo.phone}
+                              onChange={(e) => setCustomerInfo({ phone: e.target.value })}
+                              disabled={isSubmitting}
+                              className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
+                              dir="rtl"
+                            />
+
+                            <textarea
+                              data-testid="input-customer-address"
+                              ref={addressRef}
+                              rows={1}
+                              placeholder="العنوان بالتفصيل (المنطقة، الشارع، العمارة)"
+                              value={customerInfo.address}
+                              onChange={(e) => setCustomerInfo({ address: e.target.value })}
+                              disabled={isSubmitting}
+                              className="max-h-[120px] w-full resize-none overflow-y-auto rounded-xl border bg-gray-50 px-4 py-3 text-right leading-relaxed outline-none focus:border-[#2C643E] focus:bg-white"
+                              dir="rtl"
+                            />
+                          </div>
+
+                          <div className="mb-2 mt-6 space-y-4 border-t pt-6">
+                            <h3 className="w-full text-center text-lg font-bold text-gray-800">طريقة الدفع</h3>
+                            <div className="grid grid-cols-2 gap-3" dir="rtl">
+                              <button
+                                onClick={() => setPaymentMethod('card')}
+                                disabled={isSubmitting}
+                                className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
+                                  paymentMethod === 'card'
+                                    ? 'border-[#2C643E] bg-green-50 text-[#2C643E]'
+                                    : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                                }`}
+                              >
+                                <CreditCard className="h-6 w-6" />
+                                <span className="text-sm font-bold">بطاقة بنكية</span>
+                              </button>
+
+                              <button
+                                onClick={() => setPaymentMethod('cod')}
+                                disabled={isSubmitting}
+                                className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
+                                  paymentMethod === 'cod'
+                                    ? 'border-[#2C643E] bg-green-50 text-[#2C643E]'
+                                    : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                                }`}
+                              >
+                                <Banknote className="h-6 w-6" />
+                                <span className="text-sm font-bold">عند الاستلام</span>
+                              </button>
+                            </div>
+                          </div>
+                        </>
                       )}
-                    </AnimatePresence>
-
-                    <div className="mb-4 space-y-2 text-sm text-gray-600" dir="rtl">
-                      <div className="flex justify-between">
-                        <span>المجموع</span>
-                        <span className="font-bold">{cartTotal.toFixed(2)} ج.م</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>رسوم التوصيل</span>
-                        <span className="font-bold">{DELIVERY_FEE.toFixed(2)} ج.م</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2 text-lg font-black text-gray-800">
-                        <span>الإجمالي</span>
-                        <span>{finalTotal.toFixed(2)} ج.م</span>
-                      </div>
                     </div>
 
-                    <button
-		      data-testid="checkout-submit-button"
-                      onClick={handleCheckout}
-                      disabled={isSubmitting}
-                      className={`flex w-full items-center justify-center rounded-2xl bg-[#2C643E] py-4 text-lg font-black text-white shadow-[0_8px_20px_rgba(44,100,62,0.3)] transition-all ${
-                        isFormIncomplete || isSubmitting ? 'opacity-50' : 'active:scale-[0.98]'
-                      }`}
-                    >
-                      {isSubmitting ? 'جاري المعالجة...' : paymentMethod === 'card' ? 'تأكيد الدفع' : 'تأكيد الطلب'}
-                    </button>
-                  </div>
+                    {items.length > 0 && (
+                      <div className="relative shrink-0 border-t bg-white pb-safe px-6 py-4">
+                        <AnimatePresence>
+                          {showScrollArrow && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute -top-12 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-sm"
+                            >
+                              مرر لإستكمال الدفع
+                              <ChevronsDown className="h-4 w-4 animate-bounce" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        <div className="mb-4 space-y-2 text-sm text-gray-600" dir="rtl">
+                          <div className="flex justify-between">
+                            <span>المجموع</span>
+                            <span className="font-bold">{cartTotal.toFixed(2)} ج.م</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>رسوم التوصيل</span>
+                            <span className="font-bold">{DELIVERY_FEE.toFixed(2)} ج.م</span>
+                          </div>
+                          <div className="flex justify-between border-t pt-2 text-lg font-black text-gray-800">
+                            <span>الإجمالي</span>
+                            <span>{finalTotal.toFixed(2)} ج.م</span>
+                          </div>
+                        </div>
+
+                        <button
+                          data-testid="checkout-submit-button"
+                          onClick={handleCheckout}
+                          disabled={isSubmitting}
+                          className={`flex w-full items-center justify-center rounded-2xl bg-[#2C643E] py-4 text-lg font-black text-white shadow-[0_8px_20px_rgba(44,100,62,0.3)] transition-all ${
+                            isFormIncomplete || isSubmitting ? 'opacity-50' : 'active:scale-[0.98]'
+                          }`}
+                        >
+                          {isSubmitting ? 'جاري المعالجة...' : paymentMethod === 'card' ? 'تأكيد الدفع' : 'تأكيد الطلب'}
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
                 )}
-              </>
-            )}
+              </AnimatePresence>
+            </div>
           </motion.div>
         </>
       )}
     </AnimatePresence>
-  )
+  );
 }

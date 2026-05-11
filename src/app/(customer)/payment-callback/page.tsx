@@ -2,19 +2,13 @@
 
 'use client';
 
-import React, { useEffect, useMemo, Suspense } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, Loader2, LucideIcon } from 'lucide-react';
+import { CheckCircle2, Loader2, LucideIcon, XCircle } from 'lucide-react';
+import Link from 'next/link';
 
 type PaymentStatus = 'pending' | 'success' | 'failure';
-
-interface PaymentMessagePayload {
-  readonly type: 'PAYMOB_PAYMENT_RESULT';
-  readonly success: boolean;
-  readonly transactionId: string | null;
-  readonly orderId: string | null;
-}
 
 interface StatusUIConfig {
   readonly icon: LucideIcon;
@@ -23,10 +17,6 @@ interface StatusUIConfig {
   readonly iconClass: string;
   readonly containerClass: string;
 }
-
-const PAYMENT_MESSAGE_TYPE = 'PAYMOB_PAYMENT_RESULT';
-
-const TARGET_ORIGIN = process.env.NEXT_PUBLIC_STORE_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : '');
 
 const STATUS_UI_REGISTRY: Record<PaymentStatus, StatusUIConfig> = {
   pending: {
@@ -39,21 +29,22 @@ const STATUS_UI_REGISTRY: Record<PaymentStatus, StatusUIConfig> = {
   success: {
     icon: CheckCircle2,
     title: 'تم الدفع بنجاح',
-    subtitle: 'جاري العودة للمتجر وإتمام الطلب...',
-    iconClass: 'h-20 w-20 text-green-600',
+    subtitle: 'شكراً لك، تم تأكيد طلبك وسنقوم بتجهيزه فوراً.',
+    iconClass: 'h-24 w-24 text-green-600',
     containerClass: 'bg-green-50 text-green-900 border-green-100',
   },
   failure: {
     icon: XCircle,
     title: 'فشلت عملية الدفع',
     subtitle: 'يرجى المحاولة مرة أخرى باستخدام طريقة دفع مختلفة.',
-    iconClass: 'h-20 w-20 text-red-600',
+    iconClass: 'h-24 w-24 text-red-600',
     containerClass: 'bg-red-50 text-red-900 border-red-100',
   },
 };
 
-function usePaymentDispatcher(): { status: PaymentStatus } {
+function CallbackController() {
   const searchParams = useSearchParams();
+  const [isIframe, setIsIframe] = useState(true);
 
   const status: PaymentStatus = useMemo(() => {
     const successParam = searchParams.get('success');
@@ -62,89 +53,69 @@ function usePaymentDispatcher(): { status: PaymentStatus } {
   }, [searchParams]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const inIframe = window.parent !== window;
+    setIsIframe(inIframe);
+
     if (status === 'pending') return;
 
-    if (typeof window === 'undefined' || window.parent === window) {
-      console.warn('[PaymentCallback] Not running inside an iframe. Message will not be dispatched.');
-      return;
-    }
-
-    if (!TARGET_ORIGIN || TARGET_ORIGIN === '*') {
-      console.error('[PaymentCallback] CRITICAL: Insecure TARGET_ORIGIN configuration. Message dispatch aborted.');
-      return;
-    }
-
-    const payload: PaymentMessagePayload = {
-      type: PAYMENT_MESSAGE_TYPE,
+    const currentOrigin = window.location.origin;
+    const payload = {
+      type: 'PAYMOB_PAYMENT_RESULT',
       success: status === 'success',
       transactionId: searchParams.get('id'),
-      orderId: searchParams.get('order'), 
+      orderId: searchParams.get('order'),
     };
 
-    try {
-      window.parent.postMessage(payload, TARGET_ORIGIN);
-    } catch (error) {
-      console.error('[PaymentCallback] Failed to dispatch payment message to parent window:', error);
+    if (inIframe) {
+      try {
+        window.parent.postMessage(payload, currentOrigin);
+      } catch (error) {
+        window.location.replace(`/?payment_result=${status}`);
+      }
     }
   }, [searchParams, status]);
 
-  return { status };
-}
+  if (isIframe) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-transparent">
+        <Loader2 className="h-10 w-10 animate-spin text-[#2C643E]" />
+      </div>
+    );
+  }
 
-const LoadingFallback = () => (
-  <div 
-    className="flex min-h-[400px] flex-col items-center justify-center p-6 text-center"
-    role="status"
-    aria-live="polite"
-  >
-    <Loader2 className="h-12 w-12 animate-spin text-gray-400 mb-4" />
-    <p className="text-lg font-medium text-gray-600">جاري تحميل حالة الدفع...</p>
-  </div>
-);
-
-function PaymentStatusView({ status }: { readonly status: PaymentStatus }) {
   const config = STATUS_UI_REGISTRY[status];
   const Icon = config.icon;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`flex flex-col items-center justify-center w-full max-w-md p-8 rounded-2xl shadow-sm border ${config.containerClass}`}
-      role="status"
-      aria-live="polite"
-    >
-      <motion.div
-        initial={{ y: -10 }}
-        animate={{ y: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        <Icon className={`${config.iconClass} mb-6`} strokeWidth={1.5} aria-hidden="true" />
+    <div className="flex w-full max-w-md flex-col items-center justify-center rounded-3xl border bg-white p-8 shadow-xl">
+      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 15 }}>
+        <Icon className={`${config.iconClass} mb-6`} strokeWidth={1.5} />
       </motion.div>
       
-      <h1 className="text-2xl font-bold mb-2 tracking-tight">
-        {config.title}
-      </h1>
+      <h1 className="mb-3 text-2xl font-bold tracking-tight text-gray-800">{config.title}</h1>
       
       {config.subtitle && (
-        <p className="text-sm opacity-80 font-medium text-center">
+        <p className="mb-8 text-center text-sm font-medium text-gray-500 leading-relaxed max-w-[280px]">
           {config.subtitle}
         </p>
       )}
-    </motion.div>
+      
+      <Link
+        href="/"
+        className="w-full rounded-2xl bg-gray-100 px-6 py-4 text-center text-base font-black text-gray-800 transition-all hover:bg-gray-200 active:scale-95"
+      >
+        العودة للمتجر
+      </Link>
+    </div>
   );
-}
-
-function CallbackController() {
-  const { status } = usePaymentDispatcher();
-  return <PaymentStatusView status={status} />;
 }
 
 export default function PaymentCallbackPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 p-4 font-sans" dir="rtl">
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<Loader2 className="h-10 w-10 animate-spin text-[#2C643E]" />}>
         <CallbackController />
       </Suspense>
     </main>
