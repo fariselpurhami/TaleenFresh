@@ -4,25 +4,33 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { env } from "@/lib/env";
 
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+let rateLimiterInstance: Ratelimit | null = null;
 
-if (!REDIS_URL || !REDIS_TOKEN) {
-  throw new Error("CRITICAL: Missing Redis environment variables for rate limiting.");
+function getRateLimiter(): Ratelimit | null {
+  if (rateLimiterInstance) {
+    return rateLimiterInstance;
+  }
+
+  if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+    return null;
+  }
+
+  const redisClient = new Redis({
+    url: env.UPSTASH_REDIS_REST_URL,
+    token: env.UPSTASH_REDIS_REST_TOKEN,
+  });
+
+  rateLimiterInstance = new Ratelimit({
+    redis: redisClient,
+    limiter: Ratelimit.slidingWindow(10, "10 s"),
+    analytics: false,
+    prefix: "talin-fresh:ratelimit",
+  });
+
+  return rateLimiterInstance;
 }
-
-const redisClient = new Redis({
-  url: REDIS_URL,
-  token: REDIS_TOKEN,
-});
-
-const rateLimiter = new Ratelimit({
-  redis: redisClient,
-  limiter: Ratelimit.slidingWindow(10, "10 s"),
-  analytics: false,
-  prefix: "talin-fresh:ratelimit",
-});
 
 function getClientIp(req: NextRequest): string {
   const forwardedFor = req.headers.get("x-forwarded-for");
@@ -34,7 +42,7 @@ function getClientIp(req: NextRequest): string {
   if (realIp) {
     return realIp.trim();
   }
-  
+
   return "127.0.0.1";
 }
 
@@ -46,16 +54,14 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
       return NextResponse.next();
     }
 
-    const SECRET_KEY = process.env.ADMIN_SECRET_TOKEN;
-    if (!SECRET_KEY) {
-      console.error('[Middleware] CRITICAL ARCHITECTURAL ERROR: ADMIN_SECRET_TOKEN is missing.');
-      if (pathname.startsWith('/admin')) {
-        return new NextResponse('Internal Server Error: Security Misconfiguration', { status: 500 });
-      }
+    const secretKey = env.ADMIN_SECRET_TOKEN;
+
+    if (!secretKey && pathname.startsWith('/admin')) {
+      return new NextResponse('Internal Server Error', { status: 500 });
     }
 
     const adminToken = req.cookies.get('taleen_admin_token')?.value;
-    const isAuthenticated = Boolean(SECRET_KEY && adminToken === SECRET_KEY);
+    const isAuthenticated = Boolean(secretKey && adminToken === secretKey);
 
     const isLoginRoute = pathname === '/admin-login';
     const isAdminRoute = pathname.startsWith('/admin') && !isLoginRoute;
@@ -73,35 +79,37 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
 
     if (pathname.startsWith('/api/')) {
       const ip = getClientIp(req);
-      const { success, limit, reset, remaining } = await rateLimiter.limit(ip);
+      const limiter = getRateLimiter();
 
-      if (!success) {
-        console.warn(`[Middleware] Rate limit exceeded for IP: ${ip} on path: ${pathname}`);
+      if (limiter) {
+        const { success, limit, reset, remaining } = await limiter.limit(ip);
 
-        return new NextResponse(
-          JSON.stringify({ error: "Too many requests. Please try again later." }),
-          {
-            status: 429,
-            headers: {
-              "Content-Type": "application/json",
-              "X-RateLimit-Limit": limit.toString(),
-              "X-RateLimit-Remaining": remaining.toString(),
-              "X-RateLimit-Reset": reset.toString(),
-              "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
-            },
-          }
-        );
+        if (!success) {
+          return new NextResponse(
+            JSON.stringify({ error: "Too many requests. Please try again later." }),
+            {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "X-RateLimit-Limit": limit.toString(),
+                "X-RateLimit-Remaining": remaining.toString(),
+                "X-RateLimit-Reset": reset.toString(),
+                "Retry-After": Math.ceil((reset - Date.now()) / 1000).toString(),
+              },
+            }
+          );
+        }
+
+        const apiResponse = NextResponse.next();
+        apiResponse.headers.set("X-RateLimit-Limit", limit.toString());
+        apiResponse.headers.set("X-RateLimit-Remaining", remaining.toString());
+        return apiResponse;
       }
-
-      const apiResponse = NextResponse.next();
-      apiResponse.headers.set("X-RateLimit-Limit", limit.toString());
-      apiResponse.headers.set("X-RateLimit-Remaining", remaining.toString());
-      return apiResponse;
     }
 
     return NextResponse.next();
   } catch (error) {
-    console.error("[Middleware] Unhandled exception during request routing:", error);
+    console.error("[Middleware] Unhandled exception:", error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
