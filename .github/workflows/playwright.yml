@@ -34,6 +34,7 @@ jobs:
       SENTRY_DISABLE_AUTO_UPLOAD: "true"
       NEXT_DISABLE_ESLINT: "1"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      NODE_OPTIONS: "--no-warnings"
 
     steps:
       - name: Checkout Code
@@ -50,6 +51,14 @@ jobs:
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
+
+      - name: 💾 Cache Next.js Build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.[jt]s', '**/*.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
 
       - name: Build Next.js Application
         run: npm run build
