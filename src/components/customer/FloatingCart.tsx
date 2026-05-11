@@ -5,7 +5,7 @@
 import { useCheckout } from '@/store/useCheckout'
 import React, { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCart } from '@/hooks/useCart'
+import { useCart, selectCartTotal } from '@/hooks/useCart'
 import { useHaptics } from '@/hooks/useHaptics'
 import {
   ArrowRight,
@@ -34,13 +34,18 @@ export function FloatingCart() {
   const { customerInfo, setCustomerInfo } = useCheckout()
   const [showScrollArrow, setShowScrollArrow] = useState(false)
 
-  const { items, getCartTotal, updateQty, clearCart, removeItem, _hasHydrated } = useCart()
+  const items = useCart((state) => state.items)
+  const updateQty = useCart((state) => state.updateQty)
+  const clearCart = useCart((state) => state.clearCart)
+  const removeItem = useCart((state) => state.removeItem)
+  const _hasHydrated = useCart((state) => state._hasHydrated)
+  const cartTotal = useCart(selectCartTotal)
+  
   const { trigger } = useHaptics()
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const addressRef = useRef<HTMLTextAreaElement>(null)
 
-  const cartTotal = getCartTotal()
   const DELIVERY_FEE = 25
   const finalTotal = cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0
   const isFormIncomplete = !customerInfo.fullName || !customerInfo.phone || !customerInfo.address
@@ -129,6 +134,32 @@ export function FloatingCart() {
       textarea.style.height = `${textarea.scrollHeight}px`
     }
   }, [customerInfo.address])
+
+    useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      const data = event.data as Record<string, unknown> | null;
+
+      if (data?.type === 'PAYMOB_PAYMENT_RESULT') {
+        if (data.success) {
+          completeLocalSuccessFlow();
+        } else {
+          setPaymentUrl(null);
+          setIsSubmitting(false);
+          setErrorMsg('عذراً، فشلت عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار الدفع عند الاستلام.');
+          trigger('error');
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [trigger]);
 
   const completeLocalSuccessFlow = () => {
     trigger('success')

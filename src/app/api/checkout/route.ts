@@ -57,7 +57,8 @@ function isValidCheckoutPayload(payload: unknown): payload is CheckoutPayload {
 async function handlePaymobOrchestration(
   orderId: string,
   amount: number,
-  customer: { firstName: string; lastName: string; phone: string; address: string }
+  customer: { firstName: string; lastName: string; phone: string; address: string },
+  items: readonly CartItem[]
 ): Promise<string> {
   if (!envServer.PAYMOB_API_KEY || !envServer.PAYMOB_INTEGRATION_ID || !envServer.PAYMOB_IFRAME_ID) {
     throw new Error('Missing Paymob environment variables in env.ts');
@@ -88,7 +89,7 @@ async function handlePaymobOrchestration(
       amount_cents: amountCents,
       currency: 'EGP',
       merchant_order_id: orderId,
-      items: [],
+      items: items.map(i => ({ name: i.name, amount_cents: Math.round(i.price * 100).toString(), description: "Product", quantity: i.qty.toString() })),
     }),
     cache: 'no-store',
   });
@@ -203,7 +204,8 @@ export async function POST(req: Request) {
           lastName,
           phone: payload.customer_phone.trim(),
           address: payload.customer_address.trim() || 'NA'
-        }
+        },
+	payload.items
       );
 
       return NextResponse.json({ success: true, orderId: insertedOrder.id, url: paymentUrl }, { status: 201 });

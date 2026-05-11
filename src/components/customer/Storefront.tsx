@@ -6,11 +6,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search, Home, ShoppingBag, ShoppingCart } from 'lucide-react'
 import { motion, AnimatePresence, useAnimation } from 'framer-motion'
 import { ProductCard } from '@/components/customer/ProductCard'
-import { useCart } from '@/hooks/useCart'
+import { useCart, selectTotalItems } from '@/hooks/useCart'
 import { FloatingCart } from '@/components/customer/FloatingCart'
 import { supabase } from '@/lib/supabase/client'
 
-// إضافة readonly لحماية البيانات من التعديل غير المقصود
 export interface Product {
   readonly id: string
   readonly name_en: string
@@ -46,8 +45,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
   const [isMounted, setIsMounted] = useState(false)
   const [liveProducts, setLiveProducts] = useState<readonly Product[]>(initialProducts)
   
-  const { getTotalItems } = useCart()
-  const totalItems = getTotalItems()
+  const totalItems = useCart(selectTotalItems)
   const cartControls = useAnimation()
 
   // استخدام useCallback لمنع إعادة إنشاء الدالة وتحسين أداء الأنيميشن
