@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import { env } from "@/lib/env";
+import { envServer } from "@/lib/env-server";
 
 let rateLimiterInstance: Ratelimit | null = null;
 
@@ -13,13 +13,13 @@ function getRateLimiter(): Ratelimit | null {
     return rateLimiterInstance;
   }
 
-  if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+  if (!envServer.UPSTASH_REDIS_REST_URL || !envServer.UPSTASH_REDIS_REST_TOKEN) {
     return null;
   }
 
   const redisClient = new Redis({
-    url: env.UPSTASH_REDIS_REST_URL,
-    token: env.UPSTASH_REDIS_REST_TOKEN,
+    url: envServer.UPSTASH_REDIS_REST_URL,
+    token: envServer.UPSTASH_REDIS_REST_TOKEN,
   });
 
   rateLimiterInstance = new Ratelimit({
@@ -54,7 +54,7 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
       return NextResponse.next();
     }
 
-    const secretKey = env.ADMIN_SECRET_TOKEN;
+    const secretKey = envServer.ADMIN_SECRET_TOKEN;
 
     if (!secretKey && pathname.startsWith('/admin')) {
       return new NextResponse('Internal Server Error', { status: 500 });

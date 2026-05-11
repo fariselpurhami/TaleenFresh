@@ -13,7 +13,7 @@ const withSerwist = withSerwistInit({
 
 const nextConfig = {
   reactStrictMode: true,
-  allowedDevOrigins: ['192.168.1.5', 'localhost:3000'],
+  allowedDevOrigins: ['192.168.1.3', 'localhost:3000'],
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [

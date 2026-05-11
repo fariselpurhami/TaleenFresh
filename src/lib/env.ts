@@ -8,14 +8,14 @@ const serverSchema = z.object({
   WORKER_SECRET_TOKEN: z.string().min(1),
   ADMIN_SECRET_PIN: z.string().min(1),
   ADMIN_SECRET_TOKEN: z.string().min(1),
+  PAYMOB_HMAC_SECRET: z.string().min(1), 
+  PAYMOB_API_KEY: z.string().min(1),
+  PAYMOB_INTEGRATION_ID: z.string().min(1),
+  PAYMOB_IFRAME_ID: z.string().min(1),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
-  PAYMOB_HMAC_SECRET: z.string().min(1).optional(),
   WHATSAPP_PHONE_ID: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
-  PAYMOB_API_KEY: z.string().min(1).optional(),
-  PAYMOB_INTEGRATION_ID: z.string().min(1).optional(),
-  PAYMOB_IFRAME_ID: z.string().min(1).optional(),
 });
 
 const clientSchema = z.object({

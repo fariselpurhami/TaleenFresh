@@ -4,11 +4,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-import { env } from '@/lib/env';
+import { envServer } from '@/lib/env-server';
 
 const getSupabaseAdmin = () => {
-  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient(envServer.NEXT_PUBLIC_SUPABASE_URL, envServer.SUPABASE_SERVICE_ROLE_KEY, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -60,7 +59,7 @@ async function handlePaymobOrchestration(
   amount: number,
   customer: { firstName: string; lastName: string; phone: string; address: string }
 ): Promise<string> {
-  if (!env.PAYMOB_API_KEY || !env.PAYMOB_INTEGRATION_ID || !env.PAYMOB_IFRAME_ID) {
+  if (!envServer.PAYMOB_API_KEY || !envServer.PAYMOB_INTEGRATION_ID || !envServer.PAYMOB_IFRAME_ID) {
     throw new Error('Missing Paymob environment variables in env.ts');
   }
 
@@ -69,7 +68,7 @@ async function handlePaymobOrchestration(
   const authRes = await fetch('https://accept.paymob.com/api/auth/tokens', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_key: env.PAYMOB_API_KEY }),
+    body: JSON.stringify({ api_key: envServer.PAYMOB_API_KEY }),
     cache: 'no-store',
   });
 
@@ -125,7 +124,7 @@ async function handlePaymobOrchestration(
         state: 'Cairo',
       },
       currency: 'EGP',
-      integration_id: Number(env.PAYMOB_INTEGRATION_ID),
+      integration_id: Number(envServer.PAYMOB_INTEGRATION_ID),
     }),
     cache: 'no-store',
   });
@@ -137,7 +136,7 @@ async function handlePaymobOrchestration(
 
   const { token: paymentToken } = await paymentKeyRes.json() as { token: string };
 
-  return `https://accept.paymob.com/api/acceptance/iframes/${env.PAYMOB_IFRAME_ID}?payment_token=${paymentToken}`;
+  return `https://accept.paymob.com/api/acceptance/iframes/${envServer.PAYMOB_IFRAME_ID}?payment_token=${paymentToken}`;
 }
 
 export async function POST(req: Request) {
