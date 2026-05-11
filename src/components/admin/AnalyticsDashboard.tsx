@@ -57,7 +57,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
       >
         <p className="mb-1 text-sm font-medium text-gray-400">{label}</p>
         <p className="font-mono text-xl font-black text-[#4ADE80]">
-          {value.toLocaleString('ar-EG')} {isRevenue ? 'ج.م' : 'كجم'}
+          {value.toLocaleString('en-US')} {isRevenue ? 'ج.م' : 'كجم'}
         </p>
       </div>
     );
@@ -72,7 +72,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     const revenueByDay: Record<string, number> = {};
     const productSales: Record<string, number> = {};
 
-    const formatter = new Intl.DateTimeFormat('ar-EG', { weekday: 'short' });
+    const formatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
@@ -130,7 +130,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     {
       id: 'revenue',
       title: 'إجمالي الإيرادات',
-      value: `${analyticsData.totalRevenue.toLocaleString('ar-EG')} ج.م`,
+      value: `${analyticsData.totalRevenue.toLocaleString('en-US')} ج.م`,
       icon: DollarSign,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
@@ -139,7 +139,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     {
       id: 'orders',
       title: 'إجمالي الطلبات',
-      value: orders.length.toLocaleString('ar-EG'),
+      value: orders.length.toLocaleString('en-US'),
       icon: Package,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
@@ -148,7 +148,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     {
       id: 'items',
       title: 'الكميات المباعة',
-      value: `${analyticsData.totalItemsSold.toLocaleString('ar-EG')} كجم`,
+      value: `${analyticsData.totalItemsSold.toLocaleString('en-US')} كجم`,
       icon: TrendingUp,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
@@ -157,7 +157,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
     {
       id: 'aov',
       title: 'متوسط قيمة الطلب',
-      value: `${analyticsData.averageOrderValue.toLocaleString('ar-EG')} ج.م`,
+      value: `${analyticsData.averageOrderValue.toLocaleString('en-US')} ج.م`,
       icon: Clock,
       color: 'text-purple-600',
       bg: 'bg-purple-50',
@@ -286,7 +286,7 @@ export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
                       {product.name}
                     </span>
                     <span className="whitespace-nowrap font-mono text-xs font-bold text-gray-500">
-                      {product.qty.toLocaleString('ar-EG')} كجم
+                      {product.qty.toLocaleString('en-US')} كجم
                     </span>
                   </div>
 

@@ -62,7 +62,8 @@ const DELIVERY_FEE = 25;
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
-  const formatter = new Intl.DateTimeFormat('ar-EG', {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    numberingSystem: 'latn',
     month: 'long',
     day: 'numeric',
     hour: 'numeric',
@@ -291,7 +292,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                             <span className="font-semibold text-gray-800">{item.name}</span>
                           </div>
                           <span className="font-mono font-bold text-gray-600">
-                            {(item.price * item.qty).toLocaleString('ar-EG')} ج
+                            {(item.price * item.qty).toLocaleString('en-US')} ج
                           </span>
                         </div>
                       ))}
@@ -301,7 +302,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                           <span className="font-medium text-gray-500">خدمة التوصيل</span>
                         </div>
                         <span className="font-mono font-bold text-gray-600">
-                          {DELIVERY_FEE.toLocaleString('ar-EG')} ج
+                          {DELIVERY_FEE.toLocaleString('en-US')} ج
                         </span>
                       </div>
                     </div>
@@ -344,7 +345,7 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
                       الإجمالي شامل
                     </p>
                     <p className="font-mono text-xl font-black text-green-700">
-                      {order.total_price.toLocaleString('ar-EG')} ج.م
+                      {order.total_price.toLocaleString('en-US')} ج.م
                     </p>
                   </div>
                 </footer>
