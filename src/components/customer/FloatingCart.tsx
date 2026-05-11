@@ -397,6 +397,7 @@ export function FloatingCart() {
                 ) : isOrdered ? (
                   <motion.div
                     key="success-view"
+		    data-testid="order-success-view"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
@@ -411,7 +412,7 @@ export function FloatingCart() {
                       <CheckCircle2 className="mb-6 h-24 w-24 text-green-500" strokeWidth={1.5} />
                     </motion.div>
                     <h3 className="mb-2 text-2xl font-bold text-gray-800">تم استلام طلبك!</h3>
-                    <p className="font-medium text-gray-500">جاري التجهيز الآن يا {customerInfo.fullName.split(' ')[0]}</p>
+                    <p data-testid="order-success-message" className="font-medium text-gray-500">جاري التجهيز الآن يا {customerInfo.fullName.split(' ')[0]}</p>
                   </motion.div>
 
                 ) : (
