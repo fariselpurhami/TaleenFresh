@@ -1,8 +1,5 @@
-// src/app/layout.tsx
-
 import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
-
 import './globals.css';
 
 const cairo = Cairo({
@@ -40,22 +37,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+interface RootLayoutProps {
+  readonly children: React.ReactNode;
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html
-      lang="ar"
-      dir="rtl"
-      className={`${cairo.variable} scroll-smooth`}
+    <html 
+      lang="ar" 
+      dir="rtl" 
+      className={cairo.variable} 
       suppressHydrationWarning
     >
-      <body
-        className="mx-auto flex min-h-dvh max-w-[430px] flex-col overflow-x-hidden bg-background font-sans text-foreground shadow-2xl antialiased selection:bg-primary/20 selection:text-primary bg-pattern-watermark landscape:max-w-full md:landscape:max-w-full"
-        suppressHydrationWarning
-      >
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-primary/20 selection:text-primary">
         {children}
       </body>
     </html>
