@@ -49,7 +49,9 @@ export function FloatingCart() {
 
   const DELIVERY_FEE = 25
   const finalTotal = cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0
-  const isFormIncomplete = !customerInfo.fullName || !customerInfo.phone || !customerInfo.address || paymentMethod === null
+  const isMissingInputs = !customerInfo.fullName || !customerInfo.phone || !customerInfo.address
+  const isMissingPayment = paymentMethod === null
+  const isFormIncomplete = isMissingInputs || isMissingPayment
   const resetCheckoutState = () => {
     setIsSubmitting(false)
     setIsOrdered(false)
@@ -62,6 +64,8 @@ export function FloatingCart() {
    
     setPaymentMethod(null)
   }
+  const formContainerRef = useRef<HTMLDivElement>(null)
+  const [isFormVisible, setIsFormVisible] = useState(false)
 
   const processOfflineQueue = async () => {
     if (!navigator.onLine) return
@@ -75,6 +79,37 @@ export function FloatingCart() {
       if (!error) localStorage.removeItem('offline_orders')
     } catch {}
   }
+
+  useEffect(() => {
+  if (!isOpen || items.length === 0) {
+    setIsFormVisible(false);
+    return;
+  }
+
+  const targetNode = formContainerRef.current;
+  const rootNode = scrollContainerRef.current;
+
+  if (!targetNode) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setIsFormVisible(entry.isIntersecting);
+      }
+    },
+    {
+      root: rootNode,
+      threshold: 0.4,
+    }
+  );
+
+  observer.observe(targetNode);
+
+  return () => {
+    observer.disconnect();
+  };
+}, [isOpen, items.length]);
 
   useEffect(() => {
     processOfflineQueue()
@@ -490,7 +525,7 @@ export function FloatingCart() {
                             })}
                           </div>
 
-                          <div id="delivery-form" className="mt-6 space-y-4 border-t pt-6">
+                          <div id="delivery-form" ref={formContainerRef} className="mt-6 space-y-4 border-t pt-6">
                             {errorMsg && (
                               <div
                                 className="rounded-xl border border-red-100 bg-red-50 p-3 text-right text-sm font-bold text-red-600"
@@ -576,7 +611,7 @@ export function FloatingCart() {
                     {items.length > 0 && (
                       <div className="relative shrink-0 border-t bg-white pb-safe px-6 py-4">
                         <AnimatePresence>
-                          {showScrollArrow && (
+                          {showScrollArrow && isFormIncomplete && ((isMissingInputs && !isFormVisible) || (!isMissingInputs && isMissingPayment)) && (
                             <motion.div
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
