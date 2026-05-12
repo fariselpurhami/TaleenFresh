@@ -114,7 +114,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
       <header className="flex items-center justify-between px-6 pb-1 pt-0">
         <div className="flex items-center gap-3">
           <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white p-0.5 shadow-md">
-            <img src="/icon-512x512.jpg" alt="Taleen Fresh Logo" className="h-full w-full object-contain" />
+            <img src="/icon-512x512.png" alt="TaleenFresh" className="h-full w-full object-contain" />
           </div>
           <div>
             <h2 className="text-sm font-black text-foreground">{greeting}</h2>
