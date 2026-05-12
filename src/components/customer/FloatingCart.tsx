@@ -60,7 +60,7 @@ export function FloatingCart() {
 
   const resetCustomerState = () => {
    
-    setPaymentMethod('null')
+    setPaymentMethod(null)
   }
 
   const processOfflineQueue = async () => {
