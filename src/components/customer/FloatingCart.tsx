@@ -1,3 +1,4 @@
+// src/components/customer/FloatingCart.tsx
 
 'use client'
 
