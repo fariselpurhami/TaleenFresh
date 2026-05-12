@@ -2,44 +2,87 @@
 
 'use client'
 
-import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { ShoppingCart, Check } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Check, ShoppingCart } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 
 interface ProductCardProps {
-  id: string
-  name: string
-  price: number
-  imageUrl: string
-  isAvailable: boolean
-  category: string
-  priority?: boolean
+  readonly id: string
+  readonly name: string
+  readonly price: number
+  readonly imageUrl: string
+  readonly isAvailable: boolean
+  readonly category: string
+  readonly priority?: boolean
 }
 
-export const ProductCard = React.memo(function ProductCard({
+interface CartProductInput {
+  readonly id: string
+  readonly name: string
+  readonly price: number
+  readonly category: string
+}
+
+const ADD_FEEDBACK_DURATION_MS = 800
+
+const getUnitLabel = (name: string, category: string): string => {
+  const isGrapeLeaves = name.includes('عنب')
+  return category === 'leaf_greens' && !isGrapeLeaves ? 'حزمة' : 'كجم'
+}
+
+const formatPrice = (price: number): string => price.toFixed(2)
+
+export const ProductCard = memo(function ProductCard({
   id,
   name,
   price,
   imageUrl,
   isAvailable,
   category,
-  priority = false
+  priority = false,
 }: ProductCardProps) {
   const addItem = useCart((state) => state.addItem)
   const [isAdded, setIsAdded] = useState(false)
+  const resetAddedStateTimeoutRef = useRef<number | null>(null)
 
-  const isGrapeLeaves = name.includes('عنب')
-  const unit = category === 'leaf_greens' && !isGrapeLeaves ? 'حزمة' : 'كجم'
+  const unit = useMemo(() => getUnitLabel(name, category), [category, name])
+  const formattedPrice = useMemo(() => formatPrice(price), [price])
 
-  const handleAdd = () => {
+  const clearResetTimer = useCallback(() => {
+    if (resetAddedStateTimeoutRef.current !== null) {
+      window.clearTimeout(resetAddedStateTimeoutRef.current)
+      resetAddedStateTimeoutRef.current = null
+    }
+  }, [])
+
+  const handleAdd = useCallback(() => {
     if (!isAvailable) return
+
+    const product: CartProductInput = {
+      id,
+      name,
+      price,
+      category,
+    }
+
     window.dispatchEvent(new CustomEvent('cart-bounce'))
-    addItem({ id, name, price, category } as any)
+    addItem(product as never)
     setIsAdded(true)
-    setTimeout(() => setIsAdded(false), 800)
-  }
+    clearResetTimer()
+
+    resetAddedStateTimeoutRef.current = window.setTimeout(() => {
+      setIsAdded(false)
+      resetAddedStateTimeoutRef.current = null
+    }, ADD_FEEDBACK_DURATION_MS)
+  }, [addItem, category, clearResetTimer, id, isAvailable, name, price])
+
+  useEffect(() => {
+    return () => {
+      clearResetTimer()
+    }
+  }, [clearResetTimer])
 
   return (
     <motion.div
@@ -74,7 +117,7 @@ export const ProductCard = React.memo(function ProductCard({
         <div className="flex w-full min-w-0 flex-col items-start">
           <div className="flex w-full flex-nowrap items-baseline truncate text-right">
             <span className="shrink-1 text-[17px] font-black tracking-tight text-[#2C643E]">
-              {price.toFixed(2)}
+              {formattedPrice}
             </span>
             <div className="ml-1.5 flex shrink-0 items-baseline gap-0.5">
               <span className="text-[12px] font-bold text-[#2C643E]">ج.م</span>
@@ -84,18 +127,20 @@ export const ProductCard = React.memo(function ProductCard({
         </div>
 
         <button
-	  data-testid="add-to-cart-button"
+          type="button"
+          data-testid="add-to-cart-button"
           onClick={handleAdd}
           disabled={!isAvailable}
+          aria-label={isAvailable ? `أضف ${name} إلى السلة` : `${name} غير متاح حالياً`}
           className={`relative flex h-10 w-full shrink-0 items-center justify-center gap-2 overflow-hidden rounded-xl text-[13px] font-bold text-white shadow-sm transition-all duration-300 disabled:opacity-50 active:scale-95 ${
             isAdded ? 'bg-green-600' : 'bg-[#2C643E] hover:bg-green-600 hover:shadow-md'
           }`}
         >
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             {isAdded ? (
               <motion.div
                 key="added"
-		data-testid="added-to-cart-icon"
+                data-testid="added-to-cart-icon"
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -20, opacity: 0 }}
