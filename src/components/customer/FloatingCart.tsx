@@ -30,7 +30,7 @@ export function FloatingCart() {
   const [isOrdered, setIsOrdered] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
   const { customerInfo, setCustomerInfo } = useCheckout()
   const [showScrollArrow, setShowScrollArrow] = useState(false)
   const [isPaymentFailed, setIsPaymentFailed] = useState(false)
@@ -49,8 +49,7 @@ export function FloatingCart() {
 
   const DELIVERY_FEE = 25
   const finalTotal = cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0
-  const isFormIncomplete = !customerInfo.fullName || !customerInfo.phone || !customerInfo.address
-  
+  const isFormIncomplete = !customerInfo.fullName || !customerInfo.phone || !customerInfo.address || paymentMethod === null
   const resetCheckoutState = () => {
     setIsSubmitting(false)
     setIsOrdered(false)
@@ -61,7 +60,7 @@ export function FloatingCart() {
 
   const resetCustomerState = () => {
    
-    setPaymentMethod('cod')
+    setPaymentMethod('null')
   }
 
   const processOfflineQueue = async () => {
@@ -613,7 +612,7 @@ export function FloatingCart() {
                             isFormIncomplete || isSubmitting ? 'opacity-50' : 'active:scale-[0.98]'
                           }`}
                         >
-                          {isSubmitting ? 'جاري المعالجة...' : paymentMethod === 'card' ? 'تأكيد الدفع' : 'تأكيد الطلب'}
+                          {isSubmitting ? 'جاري المعالجة...' : paymentMethod === null ? 'اختر طريقة الدفع' : paymentMethod === 'card' ? 'تأكيد الدفع' : 'تأكيد الطلب'}
                         </button>
                       </div>
                     )}
