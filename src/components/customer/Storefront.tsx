@@ -150,7 +150,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
             type="text"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="ابحث عن الخضروات والفواكه والورقيات..."
+            placeholder="ابحث عن الخضروات والفواكه..."
             className="flex-1 bg-transparent text-[16px] font-bold text-gray-800 outline-none placeholder:font-medium placeholder:text-gray-400"
             autoComplete="off"
             autoCorrect="off"

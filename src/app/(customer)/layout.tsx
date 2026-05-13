@@ -56,7 +56,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
           backgroundRepeat: 'repeat',
           backgroundSize: '400px',
           backgroundPosition: 'center 0',
-          opacity: 0.35,
+          opacity: 0.32,
         }}
       />
       
