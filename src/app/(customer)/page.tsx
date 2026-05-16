@@ -33,7 +33,7 @@ export default async function CustomerHomePage() {
   const { data: initialProducts } = await supabase
     .from('products')
     .select('*')
-    .order('name_en', { ascending: true });
+    .order('name', { ascending: true });
 
   return (
     <main className="min-h-screen bg-transparent pb-32 selection:bg-emerald-200 selection:text-emerald-900">

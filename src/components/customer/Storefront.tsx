@@ -12,11 +12,10 @@ import { supabase } from '@/lib/supabase/client'
 
 export interface Product {
   readonly id: string
-  readonly name_en: string
-  readonly name_ar?: string
+  readonly name: string
   readonly category: string
   readonly image_url: string
-  readonly price_per_kg: number
+  readonly price: number
   readonly is_available: boolean
 }
 
@@ -95,8 +94,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
     const normalizedQuery = searchQuery.trim().toLowerCase()
 
     return liveProducts.filter((product) => {
-      const nameEn = product.name_en?.toLowerCase() ?? ''
-      const nameAr = product.name_ar?.toLowerCase() ?? ''
+      const nameAr = product.name?.toLowerCase() ?? ''
 
       const matchesSearch =
         normalizedQuery === '' ||
@@ -215,7 +213,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
             <AnimatePresence mode="popLayout">
               {filteredProducts.map((product, index) => (
                 <motion.div
-                  key={`${product.id}-${product.price_per_kg}`}
+                  key={`${product.id}-${product.price}`}
                   layout
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -224,8 +222,8 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
                 >
                   <ProductCard
                     id={product.id}
-                    name={product.name_ar ?? product.name_en ?? ''}
-                    price={product.price_per_kg}
+                    name={product.name}
+                    price={product.price}
                     imageUrl={product.image_url}
                     isAvailable={product.is_available}
                     category={product.category}

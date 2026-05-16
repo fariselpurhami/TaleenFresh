@@ -31,10 +31,9 @@ const supabaseAdmin = createClient(
 
 interface Product {
   readonly id: string;
-  readonly name_en: string;
-  readonly name_ar?: string;
+  readonly name: string;
   readonly category: string;
-  readonly price_per_kg: number;
+  readonly price: number;
   readonly is_available: boolean;
   readonly image_url?: string;
 }
@@ -65,7 +64,7 @@ export async function fetchAdminDashboardData(): Promise<FetchAdminDashboardResu
 
   try {
     const [productsRes, ordersRes] = await Promise.all([
-      supabaseAdmin.from('products').select('*').order('name_en'),
+      supabaseAdmin.from('products').select('*').order('name'),
       supabaseAdmin.from('orders').select('*').order('created_at', { ascending: false }),
     ]);
 

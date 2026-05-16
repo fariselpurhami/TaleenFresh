@@ -9,9 +9,8 @@ import { updateProductAction } from '@/app/actions/admin-actions';
 
 export interface Product {
   id: string;
-  name_ar?: string;
-  name_en?: string;
-  price_per_kg: number;
+  name: string;
+  price: number;
   is_available: boolean;
   image_url?: string;
 }
@@ -23,12 +22,12 @@ interface AdminProductCardProps {
 export function AdminProductCard({ product }: AdminProductCardProps) {
   const router = useRouter();
 
-  const [price, setPrice] = useState<string>(product.price_per_kg.toString());
+  const [price, setPrice] = useState<string>(product.price.toString());
   const [isAvailable, setIsAvailable] = useState<boolean>(product.is_available);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  const displayName = product.name_ar || product.name_en || 'منتج غير معروف';
+  const displayName = product.name || 'منتج غير معروف';
 
   const handleUpdate = useCallback(async () => {
     const parsedPrice = parseFloat(price);
@@ -43,7 +42,7 @@ export function AdminProductCard({ product }: AdminProductCardProps) {
 
     try {
       const result = await updateProductAction(product.id, {
-        price_per_kg: parsedPrice,
+        price: parsedPrice,
         is_available: isAvailable,
       });
 
