@@ -146,18 +146,18 @@ export function FloatingCart() {
 
   const isMissingInputs = useMemo(
     () =>
-      !customerInfo.fullName.trim() ||
+      !customerInfo.name.trim() ||
       !customerInfo.phone.trim() ||
       !customerInfo.address.trim(),
-    [customerInfo.address, customerInfo.fullName, customerInfo.phone]
+    [customerInfo.address, customerInfo.name, customerInfo.phone]
   )
 
   const isMissingPayment = paymentMethod === null
   const isFormIncomplete = isMissingInputs || isMissingPayment
   const firstCustomerName = useMemo(() => {
-    const firstPart = customerInfo.fullName.trim().split(/\s+/)[0]
+    const firstPart = customerInfo.name.trim().split(/\s+/)[0]
     return firstPart || 'عميلنا'
-  }, [customerInfo.fullName])
+  }, [customerInfo.name])
 
   const showScrollHint = useMemo(
     () =>
@@ -253,7 +253,7 @@ export function FloatingCart() {
 
   const buildOrderPayload = useCallback((): OrderPayload => {
     return {
-      customer_name: customerInfo.fullName.trim(),
+      customer_name: customerInfo.name.trim(),
       customer_phone: customerInfo.phone.trim(),
       customer_address: customerInfo.address.trim(),
       items: items.map((item) => ({
@@ -265,7 +265,7 @@ export function FloatingCart() {
       status: 'pending',
       payment_method: paymentMethod as PaymentMethod,
     }
-  }, [customerInfo.address, customerInfo.fullName, customerInfo.phone, finalTotal, items, paymentMethod])
+  }, [customerInfo.address, customerInfo.name, customerInfo.phone, finalTotal, items, paymentMethod])
 
   const handleCodCheckout = useCallback(
     async (orderData: OrderPayload) => {
@@ -766,9 +766,9 @@ export function FloatingCart() {
                               data-testid="input-customer-name"
                               type="text"
                               placeholder="الاسم الثلاثي"
-                              value={customerInfo.fullName}
+                              value={customerInfo.name}
                               onChange={(event) =>
-                                setCustomerInfo({ fullName: event.target.value })
+                                setCustomerInfo({ name: event.target.value })
                               }
                               disabled={isSubmitting}
                               className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
