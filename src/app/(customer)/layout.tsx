@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, Noto_Kufi_Arabic } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import '@/app/globals.css';
+import { ViewportEnforcer } from '@/components/customer/ViewportEnforcer';
 
 const notoKufi = Noto_Kufi_Arabic({
   subsets: ['arabic'],
@@ -48,6 +49,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         inter.variable
       )}
     >
+      <ViewportEnforcer />
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 mix-blend-multiply will-change-transform"
@@ -73,7 +75,9 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         />
         
         <div className="relative z-10 flex flex-1 flex-col h-full">
+	  
           {children}
+	  
         </div>
       </main>
     </div>
