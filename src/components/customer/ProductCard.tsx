@@ -108,6 +108,16 @@ export const ProductCard = memo(function ProductCard({
           quality={75}
           loading={priority ? 'eager' : 'lazy'}
         />
+
+	{!isAvailable && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center">
+	    <div className="flex items-center justify-center border border-white/10 bg-gray-900/75 px-3.5 py-1.5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.2)] backdrop-blur-md">
+              <span className="text-[15px] font-black tracking-widest text-white drop-shadow-md">
+                غير متوفر
+              </span>
+            </div>
+	  </div>
+        )}
       </div>
 
       <div className="mt-auto flex w-full flex-col gap-2">
