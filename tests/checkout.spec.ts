@@ -61,6 +61,8 @@ test.describe('E-Commerce Critical Flow: Checkout', () => {
     const submitButton = page.getByTestId('checkout-submit-button');
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
+    
+    await page.waitForURL('**/checkout/success*', { timeout: 10000 });
 
     const successView = page.getByTestId('order-success-view');
     await successView.waitFor({ state: 'visible', timeout: 10000 });
