@@ -1,32 +1,37 @@
-// src/store/useCheckout.ts
+// src/store/useCheckout.ts 
 
 import { create } from 'zustand';
-import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 
 const safeLocalStorage: StateStorage = {
-  getItem: (name: string): string | null => {
-    if (typeof window === 'undefined') return null;
+  getItem: (name) => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
     try {
       return window.localStorage.getItem(name);
     } catch {
       return null;
     }
   },
-  setItem: (name: string, value: string): void => {
-    if (typeof window === 'undefined') return;
+  setItem: (name, value) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     try {
       window.localStorage.setItem(name, value);
-    } catch {
-      // Ignore write errors
-    }
+    } catch {}
   },
-  removeItem: (name: string): void => {
-    if (typeof window === 'undefined') return;
+  removeItem: (name) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     try {
       window.localStorage.removeItem(name);
-    } catch {
-      // Ignore remove errors
-    }
+    } catch {}
   },
 };
 
@@ -38,27 +43,48 @@ export interface CustomerInfo {
 
 export interface CheckoutState {
   customerInfo: CustomerInfo;
+  hasHydrated: boolean;
   setCustomerInfo: (info: Partial<CustomerInfo>) => void;
+  resetCustomerInfo: () => void;
+  setHasHydrated: (value: boolean) => void;
 }
+
+const initialCustomerInfo: CustomerInfo = {
+  name: '',
+  phone: '',
+  address: '',
+};
 
 export const useCheckout = create<CheckoutState>()(
   persist(
     (set) => ({
-      customerInfo: {
-        name: '',
-        phone: '',
-        address: '',
-      },
-
-      setCustomerInfo: (info: Partial<CustomerInfo>) =>
+      customerInfo: initialCustomerInfo,
+      hasHydrated: false,
+      setCustomerInfo: (info) =>
         set((state) => ({
-          customerInfo: { ...state.customerInfo, ...info },
+          customerInfo: {
+            ...state.customerInfo,
+            ...info,
+          },
         })),
+      resetCustomerInfo: () =>
+        set({
+          customerInfo: initialCustomerInfo,
+        }),
+      setHasHydrated: (value) =>
+        set({
+          hasHydrated: value,
+        }),
     }),
     {
-      name: 'TaleenFresh-guest-info',
+      name: 'taleenfresh-checkout',
       storage: createJSONStorage(() => safeLocalStorage),
-      skipHydration: typeof window === 'undefined',
+      partialize: (state) => ({
+        customerInfo: state.customerInfo,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
