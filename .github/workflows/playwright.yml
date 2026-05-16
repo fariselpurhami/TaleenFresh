@@ -30,6 +30,7 @@ jobs:
       UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
       PAYMOB_HMAC_SECRET: ${{ secrets.PAYMOB_HMAC_SECRET }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       NEXT_PUBLIC_APP_URL: "http://localhost:3000"
       SENTRY_DISABLE_AUTO_UPLOAD: "true"
       NEXT_DISABLE_ESLINT: "1"
