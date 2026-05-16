@@ -31,7 +31,7 @@ const safeLocalStorage: StateStorage = {
 };
 
 export interface CustomerInfo {
-  fullName: string;
+  name: string;
   phone: string;
   address: string;
 }
@@ -45,7 +45,7 @@ export const useCheckout = create<CheckoutState>()(
   persist(
     (set) => ({
       customerInfo: {
-        fullName: '',
+        name: '',
         phone: '',
         address: '',
       },
