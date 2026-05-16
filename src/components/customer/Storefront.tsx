@@ -90,22 +90,18 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
     }
   }, [initialProducts, handleCartBounce])
 
+
   const filteredProducts = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase()
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
 
-    return liveProducts.filter((product) => {
-      const nameAr = product.name?.toLowerCase() ?? ''
+  return liveProducts.filter(({ name, category }) => {
+    const normalizedName = typeof name === 'string' ? name.toLocaleLowerCase() : '';
+    const matchesSearch = normalizedQuery.length === 0 || normalizedName.includes(normalizedQuery);
+    const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
 
-      const matchesSearch =
-        normalizedQuery === '' ||
-        name.includes(normalizedQuery)
-
-      const matchesCategory =
-        selectedCategory === 'all' || product.category === selectedCategory
-
-      return matchesSearch && matchesCategory
-    })
-  }, [liveProducts, searchQuery, selectedCategory])
+    return matchesSearch && matchesCategory;
+  });
+}, [liveProducts, searchQuery, selectedCategory]);
 
   const handleOpenCartClick = useCallback(() => {
     window.dispatchEvent(new CustomEvent('open-cart'))
