@@ -1,4 +1,4 @@
-// src/components/customer/FloatingCart.tsx
+//  src/components/customer/FloatingCart.tsx
 
 'use client'
 
@@ -19,7 +19,6 @@ import {
 import { useCheckout } from '@/store/useCheckout'
 import { useCart, selectCartTotal } from '@/hooks/useCart'
 import { useHaptics } from '@/hooks/useHaptics'
-import { supabase } from '@/lib/supabase/client'
 
 type PaymentMethod = 'cod' | 'card'
 
@@ -217,9 +216,28 @@ export function FloatingCart() {
     const queuedOrders = readOfflineOrders()
     if (queuedOrders.length === 0) return
 
-    const { error } = await supabase.from('orders').insert(queuedOrders)
-    if (!error) {
+    const remainingOrders: OrderPayload[] = []
+
+    for (const order of queuedOrders) {
+      try {
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order),
+        })
+
+        if (!response.ok && response.status >= 500) {
+          remainingOrders.push(order)
+        }
+      } catch {
+        remainingOrders.push(order)
+      }
+    }
+
+    if (remainingOrders.length === 0) {
       clearOfflineOrders()
+    } else {
+      writeOfflineOrders(remainingOrders)
     }
   }, [])
 
@@ -279,30 +297,36 @@ export function FloatingCart() {
       const timeoutId = window.setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS)
 
       try {
-        const { error } = await supabase
-          .from('orders')
-          .insert([orderData])
-          .abortSignal(controller.signal)
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData),
+          signal: controller.signal,
+        })
 
-        if (error) {
-          throw new Error(error.message)
+        const data = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          if (response.status === 409) throw new Error('PRICE_MISMATCH')
+          throw new Error(data?.error || 'فشل تسجيل الطلب')
         }
 
         completeLocalSuccessFlow()
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'حدث خطأ غير متوقع أثناء تنفيذ العملية'
+        const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع'
 
-        if (
-          (error instanceof Error && error.name === 'AbortError') ||
-          message.includes('Failed to fetch')
-        ) {
+        if (error instanceof Error && error.name === 'AbortError') {
           enqueueOfflineOrder(orderData)
           completeLocalSuccessFlow()
           return
         }
 
-        setErrorMsg('عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.')
+        if (message === 'PRICE_MISMATCH') {
+          setErrorMsg('عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.')
+        } else {
+          setErrorMsg('عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.')
+        }
+
         setIsSubmitting(false)
         trigger('error')
       } finally {
@@ -322,6 +346,7 @@ export function FloatingCart() {
     const data = (await response.json().catch(() => null)) as CheckoutApiResponse | null
 
     if (!response.ok) {
+      if (response.status === 409) throw new Error('PRICE_MISMATCH')
       throw new Error(data?.error || data?.message || 'Payment initialization failed')
     }
 
@@ -356,9 +381,14 @@ export function FloatingCart() {
 
       await handleCodCheckout(orderData)
     } catch (error) {
-      setErrorMsg(
-        error instanceof Error ? error.message : 'حدث خطأ غير متوقع أثناء تنفيذ العملية'
-      )
+      const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع أثناء تنفيذ العملية'
+
+      if (message === 'PRICE_MISMATCH') {
+        setErrorMsg('عذراً، بعض المنتجات في سلتك لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.')
+      } else {
+        setErrorMsg(message)
+      }
+
       setIsSubmitting(false)
       trigger('error')
     }
@@ -810,7 +840,7 @@ export function FloatingCart() {
                             <div className="grid grid-cols-2 gap-3" dir="rtl">
                               <button
                                 type="button"
-				data-testid="payment-method-card"
+                                data-testid="payment-method-card"
                                 onClick={() => setPaymentMethod('card')}
                                 disabled={isSubmitting}
                                 className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
@@ -825,7 +855,7 @@ export function FloatingCart() {
 
                               <button
                                 type="button"
-				data-testid="payment-method-cod"
+                                data-testid="payment-method-cod"
                                 onClick={() => setPaymentMethod('cod')}
                                 disabled={isSubmitting}
                                 className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
