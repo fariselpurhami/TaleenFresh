@@ -98,8 +98,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
 
       const matchesSearch =
         normalizedQuery === '' ||
-        nameEn.includes(normalizedQuery) ||
-        nameAr.includes(normalizedQuery)
+        name.includes(normalizedQuery)
 
       const matchesCategory =
         selectedCategory === 'all' || product.category === selectedCategory
