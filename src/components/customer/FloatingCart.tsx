@@ -56,6 +56,14 @@ const ORDER_SUCCESS_CLOSE_DELAY_MS = 3000
 const SCROLL_STATE_CHECK_DELAY_MS = 50
 const OFFLINE_ORDERS_STORAGE_KEY = 'offline_orders'
 
+const normalizePhoneNumber = (value: string): string => {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 1632)) 
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 1776)) 
+    .replace(/\s+/g, '')                                             
+    .replace(/(?!^)\+/g, '')                                         
+    .replace(/[^\d+]/g, '');                                         
+};
 function isOrderLineItem(value: unknown): value is OrderLineItem {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
@@ -561,7 +569,8 @@ export function FloatingCart() {
             initial={{ y: '100%', x: '-50%' }}
             animate={{ y: 0, x: '-50%' }}
             exit={{ y: '100%', x: '-50%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 400, mass: 0.4 }}
+	    style={{ willChange: 'transform' }}
             className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none transition-all duration-500 ${
               paymentUrl || isPaymentFailed ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh]'
             }`}
@@ -811,7 +820,7 @@ export function FloatingCart() {
                               placeholder="رقم الهاتف"
                               value={customerInfo.phone}
                               onChange={(event) =>
-                                setCustomerInfo({ phone: event.target.value })
+                                setCustomerInfo({ phone: normalizePhoneNumber(event.target.value) })
                               }
                               disabled={isSubmitting}
                               className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
