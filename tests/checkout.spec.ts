@@ -4,17 +4,53 @@ import { test, expect } from '@playwright/test';
 
 test.describe('E-Commerce Critical Flow: Checkout', () => {
   test('Should add a product to cart and complete checkout successfully', async ({ page }) => {
-    await page.route('**/rest/v1/orders*', async (route) => {
-      if (route.request().method() === 'POST') {
-        await route.fulfill({
-          status: 201,
+     await page.route('**/api/checkout*', async (route: Route) => {
+    const request = route.request();
+
+    if (request.method() !== 'POST') {
+      return route.continue();
+    }
+
+    if (validatePayload) {
+      try {
+        const payload = request.postDataJSON();
+        if (!validatePayload(payload)) {
+          return route.fulfill({
+            status: 400,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: false, error: 'Invalid Payload' }),
+          });
+        }
+      } catch {
+        return route.fulfill({
+          status: 400,
           contentType: 'application/json',
-          body: JSON.stringify([{ id: 'mock-order-123', status: 'pending' }]),
+          body: JSON.stringify({ success: false, error: 'Malformed JSON' }),
         });
-      } else {
-        await route.continue();
       }
-    });
+    }
+
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    try {
+      await route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify(responseBody),
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Target page, context or browser has been closed')
+      ) {
+        return;
+      }
+      throw error;
+    }
+  });
+}
 
     await page.goto('http://localhost:3000/');
 
