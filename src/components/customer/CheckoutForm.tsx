@@ -29,24 +29,30 @@ export default function CheckoutForm() {
     return (
       <form className="flex w-full flex-col gap-4" aria-busy="true">
         <div className="space-y-2">
-          <Label htmlFor="fullName">الاسم بالكامل</Label>
-          <Input id="fullName" name="fullName" disabled placeholder="الاسم بالكامل" />
+          <Label htmlFor="name">الاسم بالكامل</Label>
+          <Input
+            id="name"
+            name="name"
+            disabled
+            placeholder="الاسم بالكامل"
+            autoComplete="name"
+          />
         </div>
+
         <div className="space-y-2">
           <Label htmlFor="phone">رقم التليفون</Label>
           <Input
             id="phone"
             name="phone"
-            type="tel"
-            dir="ltr"
             disabled
-            placeholder="01xxxxxxxxx"
+            placeholder="رقم التليفون"
+            autoComplete="tel"
           />
         </div>
+
         <div className="space-y-2">
           <Label htmlFor="address">العنوان بالتفصيل</Label>
           <Textarea
-	    data-testid="input-customer-address"
             id="address"
             name="address"
             disabled
@@ -61,36 +67,40 @@ export default function CheckoutForm() {
   return (
     <form className="flex w-full flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
       <div className="space-y-2">
-        <Label htmlFor="fullName">الاسم بالكامل</Label>
+        <Label htmlFor="name">الاسم بالكامل</Label>
         <Input
-	  data-testid="input-customer-name"
-          id="fullName"
-          name="fullName"
-          value={customerInfo.fullName}
+          data-testid="input-customer-name"
+          id="name"
+          name="name"
+          value={customerInfo.name}
           onChange={handleInputChange}
           placeholder="الاسم بالكامل"
           required
           autoComplete="name"
         />
       </div>
+
       <div className="space-y-2">
         <Label htmlFor="phone">رقم التليفون</Label>
         <Input
-	  data-testid="input-customer-phone"
+          data-testid="input-customer-phone"
           id="phone"
           name="phone"
           type="tel"
-          dir="ltr"
+          inputMode="tel"
           value={customerInfo.phone}
           onChange={handleInputChange}
-          placeholder="01xxxxxxxxx"
+          placeholder="رقم التليفون"
           required
           autoComplete="tel"
+          dir="ltr"
         />
       </div>
+
       <div className="space-y-2">
         <Label htmlFor="address">العنوان بالتفصيل</Label>
         <Textarea
+          data-testid="input-customer-address"
           id="address"
           name="address"
           value={customerInfo.address}
