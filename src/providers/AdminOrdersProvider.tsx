@@ -43,10 +43,6 @@ export function AdminOrdersProvider({ children, initialOrders }: AdminOrdersProv
   useEffect(() => {
     let isMounted = true;
 
-    if (typeof window !== 'undefined') {
-      audioRef.current = new Audio('/notification.mp3');
-    }
-
     const channel = supabase
       .channel('admin-global-orders')
       .on(
@@ -59,11 +55,6 @@ export function AdminOrdersProvider({ children, initialOrders }: AdminOrdersProv
           setOrders((current) => [insertedOrder, ...current]);
           setNewOrder(insertedOrder);
 
-          if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(() => {
-            });
-          }
         }
       )
       .on(
@@ -84,12 +75,6 @@ export function AdminOrdersProvider({ children, initialOrders }: AdminOrdersProv
       isMounted = false;
       supabase.removeChannel(channel);
 
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute('src');
-        audioRef.current.load();
-        audioRef.current = null;
-      }
     };
   }, []);
 
