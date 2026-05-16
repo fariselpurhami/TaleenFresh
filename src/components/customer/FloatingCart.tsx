@@ -856,13 +856,13 @@ export function FloatingCart() {
                                 type="button"
                                 data-testid="payment-method-card"
                                 onClick={() => setPaymentMethod('card')}
-                                disabled={isSubmitting}
-                                className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
-                                  paymentMethod === 'card'
-                                    ? 'border-[#2C643E] bg-green-50 text-[#2C643E]'
-                                    : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
-                                }`}
+                                disabled={true}
+                                className="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/40 p-4 text-gray-400 opacity-60 cursor-not-allowed select-none"
                               >
+                                
+                                <span className="absolute right-2 top-2 rounded-md bg-gray-200/70 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-gray-500">
+                                  قريباً
+                                </span>
                                 <CreditCard className="h-6 w-6" />
                                 <span className="text-sm font-bold">بطاقة بنكية</span>
                               </button>
