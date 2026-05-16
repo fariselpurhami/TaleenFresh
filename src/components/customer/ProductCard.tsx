@@ -32,7 +32,8 @@ const getUnitLabel = (name: string, category: string): string => {
   return category === 'leaf_greens' && !isGrapeLeaves ? 'حزمة' : 'كجم'
 }
 
-const formatPrice = (price: number): string => price.toFixed(2)
+const formatPrice = (price?: number): string =>
+  typeof price === 'number' && Number.isFinite(price) ? price.toFixed(2) : '0.00';
 
 export const ProductCard = memo(function ProductCard({
   id,
