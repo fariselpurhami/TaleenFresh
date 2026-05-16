@@ -13,7 +13,6 @@ function attachBrowserDiagnostics(page: Page) {
 
   page.on('response', (response) => {
     if (response.status() === 404) {
-      // أول ما يلمح 404 هيطبع الرابط الصريح للملف المفقود في الترمنال فوراً
       console.log(`🚨 [404 DETECTED URL]: ${response.url()}`);
     }
   });
