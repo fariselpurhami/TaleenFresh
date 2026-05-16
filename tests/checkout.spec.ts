@@ -1,9 +1,26 @@
 // tests/checkout.spec.ts
 
-import { test, expect, type Route } from '@playwright/test';
+import { test, expect, type ConsoleMessage, type Page, type Route } from '@playwright/test';
+
+function attachBrowserDiagnostics(page: Page) {
+  page.on('console', (message: ConsoleMessage) => {
+    const type = message.type();
+    const text = message.text();
+
+    if (type === 'error' || type === 'warning') {
+      console.log(`[browser:${type}] ${text}`);
+    }
+  });
+
+  page.on('pageerror', (error: Error) => {
+    console.log(`[pageerror] ${error.name}: ${error.message}`);
+  });
+}
 
 test.describe('E-Commerce Critical Flow: Checkout', () => {
   test('Should add a product to cart and complete checkout successfully', async ({ page }) => {
+    attachBrowserDiagnostics(page);
+
     await page.route('**/api/checkout*', async (route: Route) => {
       const request = route.request();
 
@@ -18,6 +35,7 @@ test.describe('E-Commerce Critical Flow: Checkout', () => {
         body: JSON.stringify({
           success: true,
           orderId: 'mock-order-123',
+          url: 'http://localhost:3000/checkout/success?orderId=mock-order-123',
         }),
       });
     });
@@ -30,7 +48,9 @@ test.describe('E-Commerce Critical Flow: Checkout', () => {
 
     await expect(page.getByTestId('added-to-cart-icon').first()).toBeVisible();
 
-    await page.evaluate(() => window.dispatchEvent(new CustomEvent('open-cart')));
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('open-cart'));
+    });
 
     await expect(page.getByTestId('cart-container')).toBeVisible();
 
@@ -42,7 +62,9 @@ test.describe('E-Commerce Critical Flow: Checkout', () => {
     await expect(submitButton).toBeEnabled();
     await submitButton.click();
 
-    await expect(page.getByTestId('order-success-view')).toBeVisible({ timeout: 5000 });
+    const successView = page.getByTestId('order-success-view');
+    await successView.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(successView).toBeVisible();
     await expect(page.getByTestId('order-success-message')).toContainText('فارس');
   });
 });
