@@ -566,12 +566,17 @@ export function FloatingCart() {
 
           <motion.div
             data-testid="cart-container"
-            initial={{ y: '100%', x: '-50%' }}
-            animate={{ y: 0, x: '-50%' }}
-            exit={{ y: '100%', x: '-50%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 400, mass: 0.4 }}
-	    style={{ willChange: 'transform' }}
-            className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none transition-all duration-500 ${
+            initial={{ y: '100%', x: '-50%', opacity: 0.98 }}
+            animate={{ y: 0, x: '-50%', opacity: 1 }}
+            exit={{ y: '100%', x: '-50%', opacity: 0.98 }}
+            transition={{
+              y: { type: 'spring', damping: 30, stiffness: 320, mass: 0.5 },
+              opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+              layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+            }}
+            layout
+            style={{ willChange: 'transform, opacity' }}
+            className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none ${
               paymentUrl || isPaymentFailed ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh]'
             }`}
           >

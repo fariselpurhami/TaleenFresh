@@ -1,49 +1,66 @@
-// src/components/customer/ViewportEnforcer.tsx
-
 'use client';
 
 import { useEffect } from 'react';
 
-const SMALL_MOBILE_LAYOUT_WIDTH = 428;
-const DEFAULT_VIEWPORT_CONTENT = 'width=device-width, initial-scale=1, viewport-fit=cover';
+const MIN_WIDTH = 428;
+const DEFAULT_VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover';
 
-function resolveViewportContent(screenWidth: number): string {
-  if (screenWidth > 0 && screenWidth < SMALL_MOBILE_LAYOUT_WIDTH) {
-    return `width=${SMALL_MOBILE_LAYOUT_WIDTH}, viewport-fit=cover`;
-  }
-
-  return DEFAULT_VIEWPORT_CONTENT;
+function getViewportContent(width: number): string {
+  return width > 0 && width < MIN_WIDTH
+    ? `width=${MIN_WIDTH}, viewport-fit=cover`
+    : DEFAULT_VIEWPORT;
 }
 
 export function ViewportEnforcer() {
   useEffect(() => {
-    const meta =
-      document.querySelector<HTMLMetaElement>('meta[name="viewport"]') ??
-      (() => {
-        const element = document.createElement('meta');
-        element.name = 'viewport';
-        document.head.appendChild(element);
-        return element;
-      })();
-
     const applyViewport = () => {
-      meta.setAttribute('content', resolveViewportContent(window.screen.width));
+      const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+      if (meta) {
+        meta.setAttribute('content', getViewportContent(window.screen.width));
+      }
     };
 
     applyViewport();
 
-    const handleChange = () => {
-      applyViewport();
-    };
+    const orientation = window.screen.orientation;
+    const supportsScreenOrientation = typeof orientation?.addEventListener === 'function';
 
-    window.addEventListener('resize', handleChange, { passive: true });
-    window.screen.orientation?.addEventListener?.('change', handleChange);
+    window.addEventListener('resize', applyViewport, { passive: true });
+    window.addEventListener('orientationchange', applyViewport, { passive: true });
+
+    if (supportsScreenOrientation) {
+      orientation.addEventListener('change', applyViewport);
+    }
 
     return () => {
-      window.removeEventListener('resize', handleChange);
-      window.screen.orientation?.removeEventListener?.('change', handleChange);
+      window.removeEventListener('resize', applyViewport);
+      window.removeEventListener('orientationchange', applyViewport);
+
+      if (supportsScreenOrientation) {
+        orientation.removeEventListener('change', applyViewport);
+      }
     };
   }, []);
 
-  return null;
+  const blockingScript = `
+    (function() {
+      var w = window.screen.width;
+      if (w > 0 && w < ${MIN_WIDTH}) {
+        var m = document.querySelector('meta[name="viewport"]');
+        if (!m) {
+          m = document.createElement('meta');
+          m.name = 'viewport';
+          document.head.appendChild(m);
+        }
+        m.setAttribute('content', 'width=${MIN_WIDTH}, viewport-fit=cover');
+      }
+    })();
+  `.replace(/\s+/g, ' ').trim();
+
+  return (
+    <script
+      dangerouslySetInnerHTML={{ __html: blockingScript }}
+      suppressHydrationWarning
+    />
+  );
 }
