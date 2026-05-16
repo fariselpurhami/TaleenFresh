@@ -810,6 +810,7 @@ export function FloatingCart() {
                             <div className="grid grid-cols-2 gap-3" dir="rtl">
                               <button
                                 type="button"
+				data-testid="payment-method-card"
                                 onClick={() => setPaymentMethod('card')}
                                 disabled={isSubmitting}
                                 className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
@@ -824,6 +825,7 @@ export function FloatingCart() {
 
                               <button
                                 type="button"
+				data-testid="payment-method-cod"
                                 onClick={() => setPaymentMethod('cod')}
                                 disabled={isSubmitting}
                                 className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
