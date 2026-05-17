@@ -163,10 +163,24 @@ export function useFloatingCartController(): FloatingCartController {
   }, [])
 
   const closeCart = useCallback(() => {
-    clearSuccessTimeout()
-    clearScrollStateTimeout()
-    setIsOpen(false)
-  }, [clearScrollStateTimeout, clearSuccessTimeout])
+    clearSuccessTimeout();
+    clearScrollStateTimeout();
+
+    if (isOrdered) {
+      clearCart();
+      resetCheckoutState();
+      resetCustomerState();
+    }
+
+    setIsOpen(false);
+  }, [
+    clearCart,
+    clearScrollStateTimeout,
+    clearSuccessTimeout,
+    isOrdered,
+    resetCheckoutState,
+    resetCustomerState
+ ]);
 
   const openCart = useCallback(() => {
     trigger('medium')
@@ -361,11 +375,17 @@ export function useFloatingCartController(): FloatingCartController {
       return
     }
 
-    const normalizedPhone = customerInfo.phone.replace(/[^\d+]/g, '');
-    const digitCount = normalizedPhone.replace(/\D/g, '').length;
+    const normalizedPhone = customerInfo.phone.trim();
+    const canonicalPhone = normalizedPhone.startsWith('+20')
+      ? `0${normalizedPhone.slice(3).replace(/\D/g, '')}`
+      : normalizedPhone.startsWith('0020')
+        ? `0${normalizedPhone.slice(4).replace(/\D/g, '')}`
+        : normalizedPhone.replace(/\D/g, '');
 
-    if (digitCount < 10) {
-      setErrorMsg('برجاء إدخال رقم هاتف صحيح (١٠ أرقام على الأقل)');
+    const isValidEgyptMobilePhone = /^01[0125]\d{8}$/.test(canonicalPhone);
+
+    if (!isValidEgyptMobilePhone) {
+      setErrorMsg('برجاء إدخال رقم هاتف مصري صحيح مكون من ١١ رقم (مثال: 01012345678)');
       trigger('error');
       formContainerRef.current?.scrollIntoView({
         behavior: 'smooth',

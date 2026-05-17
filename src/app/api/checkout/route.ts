@@ -63,7 +63,20 @@ const isValidCheckoutPayload = (payload: unknown): payload is CheckoutPayload =>
   const p = payload as Record<string, unknown>;
 
   if (typeof p.customer_name !== 'string' || !p.customer_name.trim() || p.customer_name.length > 100) return false;
-  if (typeof p.customer_phone !== 'string' || !/^\+?\d{10,20}$/.test(p.customer_phone.replace(/\s+/g, ''))) return false;
+  
+  if (typeof p.customer_phone !== 'string') return false;
+
+  const normalizedPhone = p.customer_phone.trim();
+  const canonicalPhone = normalizedPhone.startsWith('+20')
+    ? `0${normalizedPhone.slice(3).replace(/\D/g, '')}`
+    : normalizedPhone.startsWith('0020')
+      ? `0${normalizedPhone.slice(4).replace(/\D/g, '')}`
+      : normalizedPhone.replace(/\D/g, '');
+
+  if (!/^01[0125]\d{8}$/.test(canonicalPhone)) return false;
+
+  p.customer_phone = canonicalPhone;
+  
   if (typeof p.customer_address !== 'string' || !p.customer_address.trim() || p.customer_address.length > 500) return false;
   if (p.payment_method !== 'card' && p.payment_method !== 'cod') return false;
 
