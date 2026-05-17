@@ -17,6 +17,9 @@ export interface OrderHistoryItem {
   [key: string]: unknown;
 }
 
+type AsyncResult = Promise<void>;
+type AuthActionResult = Promise<{ error: Error | null }>;
+
 export interface CustomerState {
   isAuthenticated: boolean;
   isCheckingAuth: boolean;
@@ -25,52 +28,63 @@ export interface CustomerState {
   addresses: Address[];
   orderHistory: OrderHistoryItem[];
 
-  checkSession: () => Promise<void>;
-  loginWithOTP: (phone: string) => Promise<{ error: Error | null }>;
-  verifyOTP: (phone: string, token: string) => Promise<{ error: Error | null }>;
-  logout: () => Promise<void>;
-  fetchProfileData: (userId: string) => Promise<void>;
+  checkSession: () => AsyncResult;
+  loginWithOTP: (phone: string) => AuthActionResult;
+  verifyOTP: (phone: string, token: string) => AuthActionResult;
+  logout: () => AsyncResult;
+  fetchProfileData: (userId: string) => AsyncResult;
 }
 
-export const useCustomer = create<CustomerState>((set, get) => ({
+const getInitialCustomerState = () => ({
   isAuthenticated: false,
   isCheckingAuth: true,
-  phone: null,
-  fullName: null,
-  addresses: [],
-  orderHistory: [],
+  phone: null as string | null,
+  fullName: null as string | null,
+  addresses: [] as Address[],
+  orderHistory: [] as OrderHistoryItem[],
+});
+
+const getClearedCustomerState = () => ({
+  isAuthenticated: false,
+  phone: null as string | null,
+  fullName: null as string | null,
+  addresses: [] as Address[],
+  orderHistory: [] as OrderHistoryItem[],
+});
+
+export const useCustomer = create<CustomerState>((set, get) => ({
+  ...getInitialCustomerState(),
 
   checkSession: async () => {
     set({ isCheckingAuth: true });
 
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       if (session?.user) {
         set({
           isAuthenticated: true,
-          phone: session.user.phone ?? null
+          phone: session.user.phone ?? null,
         });
+
         await get().fetchProfileData(session.user.id);
       } else {
         set({
-          isAuthenticated: false,
-          phone: null,
-          fullName: null,
-          addresses: [],
-          orderHistory: []
+          ...getClearedCustomerState(),
         });
       }
     } catch (error) {
       console.error('[useCustomer] Session check failed:', error);
+
       set({
-        isAuthenticated: false,
-        phone: null,
-        fullName: null,
-        addresses: [],
-        orderHistory: []
+        ...getClearedCustomerState(),
       });
     } finally {
       set({ isCheckingAuth: false });
@@ -89,20 +103,30 @@ export const useCustomer = create<CustomerState>((set, get) => ({
           .from('orders')
           .select('*')
           .eq('user_id', userId)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
       ]);
+
+      if (profileRes.error) {
+        throw profileRes.error;
+      }
+
+      if (ordersRes.error) {
+        throw ordersRes.error;
+      }
 
       if (profileRes.data) {
         set({
           fullName: profileRes.data.full_name ?? null,
           addresses: Array.isArray(profileRes.data.saved_addresses)
-            ? profileRes.data.saved_addresses
-            : []
+            ? (profileRes.data.saved_addresses as Address[])
+            : [],
         });
       }
 
       if (ordersRes.data) {
-        set({ orderHistory: ordersRes.data as OrderHistoryItem[] });
+        set({
+          orderHistory: ordersRes.data as OrderHistoryItem[],
+        });
       }
     } catch (error) {
       console.error('[useCustomer] Failed to fetch profile data:', error);
@@ -112,9 +136,16 @@ export const useCustomer = create<CustomerState>((set, get) => ({
   loginWithOTP: async (phone: string) => {
     try {
       const { error } = await supabase.auth.signInWithOtp({ phone });
-      return { error };
+      return {
+        error: error ?? null,
+      };
     } catch (err) {
-      return { error: err instanceof Error ? err : new Error('Unknown error during OTP request') };
+      return {
+        error:
+          err instanceof Error
+            ? err
+            : new Error('Unknown error during OTP request'),
+      };
     }
   },
 
@@ -123,22 +154,30 @@ export const useCustomer = create<CustomerState>((set, get) => ({
       const { data, error } = await supabase.auth.verifyOtp({
         phone,
         token,
-        type: 'sms'
+        type: 'sms',
       });
 
-      if (error) return { error };
+      if (error) {
+        return { error };
+      }
 
       if (data.session?.user) {
         set({
           isAuthenticated: true,
-          phone: data.session.user.phone ?? null
+          phone: data.session.user.phone ?? null,
         });
+
         await get().fetchProfileData(data.session.user.id);
       }
 
       return { error: null };
     } catch (err) {
-      return { error: err instanceof Error ? err : new Error('Unknown error during OTP verification') };
+      return {
+        error:
+          err instanceof Error
+            ? err
+            : new Error('Unknown error during OTP verification'),
+      };
     }
   },
 
@@ -149,12 +188,8 @@ export const useCustomer = create<CustomerState>((set, get) => ({
       console.error('[useCustomer] Logout failed:', error);
     } finally {
       set({
-        isAuthenticated: false,
-        phone: null,
-        fullName: null,
-        addresses: [],
-        orderHistory: []
+        ...getClearedCustomerState(),
       });
     }
-  }
+  },
 }));
