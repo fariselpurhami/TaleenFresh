@@ -1,31 +1,15 @@
 // src/app/api/webhooks/paymob/worker/route.ts
 
 import { NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const SAAS_COMMISSION_RATE = 0.025;
 const MAX_RETRY_COUNT = 3;
 
-function getRequiredEnvVar(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`CRITICAL: Missing required environment variable: ${key}`);
-  }
-  return value;
-}
-
-function getSupabaseAdminClient(): SupabaseClient {
-  return createClient(
-    getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
-    getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
-      },
-    }
-  );
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+interface JsonObject {
+  readonly [key: string]: JsonValue;
 }
 
 interface PaymentEvent {
@@ -43,37 +27,86 @@ interface PaymobObjPayload {
   };
 }
 
+function getRequiredEnvVar(key: string): string {
+  const value = process.env[key];
+
+  if (!value) {
+    throw new Error(`CRITICAL: Missing required environment variable: ${key}`);
+  }
+
+  return value;
+}
+
+function getSupabaseAdminClient(): SupabaseClient {
+  return createClient(
+    getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
+    getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+}
+
 function extractWorkerPayload(rawBody: unknown): string | null {
-  if (!rawBody || typeof rawBody !== 'object') return null;
-  const p = rawBody as Record<string, unknown>;
-  return typeof p.transactionId === 'string' && p.transactionId.trim() !== ''
-    ? p.transactionId
+  if (!rawBody || typeof rawBody !== 'object') {
+    return null;
+  }
+
+  const payload = rawBody as Record<string, unknown>;
+  return typeof payload.transactionId === 'string' && payload.transactionId.trim() !== ''
+    ? payload.transactionId
     : null;
 }
 
 function extractPaymentDetails(payload: unknown): PaymobObjPayload | null {
-  if (!payload || typeof payload !== 'object') return null;
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
 
-  const p = payload as Record<string, unknown>;
-  if (!p.obj || typeof p.obj !== 'object') return null;
+  const root = payload as Record<string, unknown>;
+  if (!root.obj || typeof root.obj !== 'object') {
+    return null;
+  }
 
-  const obj = p.obj as Record<string, unknown>;
-
+  const obj = root.obj as Record<string, unknown>;
   const success = obj.success;
-  const amount_cents = obj.amount_cents;
-  const order = obj.order as Record<string, unknown> | undefined;
+  const amountCents = obj.amount_cents;
+  const order =
+    obj.order && typeof obj.order === 'object'
+      ? (obj.order as Record<string, unknown>)
+      : undefined;
 
-  if (typeof success !== 'boolean') return null;
-  if (typeof amount_cents !== 'number' || isNaN(amount_cents)) return null;
+  if (typeof success !== 'boolean') {
+    return null;
+  }
+
+  if (typeof amountCents !== 'number' || Number.isNaN(amountCents)) {
+    return null;
+  }
 
   return {
     success,
-    amount_cents,
-    order: order ? { merchant_order_id: String(order.merchant_order_id) } : undefined,
+    amount_cents: amountCents,
+    order: order
+      ? {
+          merchant_order_id:
+            typeof order.merchant_order_id === 'undefined' ||
+            order.merchant_order_id === null
+              ? undefined
+              : String(order.merchant_order_id),
+        }
+      : undefined,
   };
 }
 
-async function processPayment(supabaseAdmin: SupabaseClient, payload: unknown): Promise<void> {
+async function processPayment(
+  supabaseAdmin: SupabaseClient,
+  payload: unknown,
+): Promise<void> {
   const details = extractPaymentDetails(payload);
 
   if (!details) {
@@ -81,7 +114,9 @@ async function processPayment(supabaseAdmin: SupabaseClient, payload: unknown): 
   }
 
   if (!details.success) {
-    console.info(`[Payment Worker] Payment marked as unsuccessful in payload. Skipping financial updates.`);
+    console.info(
+      '[Payment Worker] Payment marked as unsuccessful in payload. Skipping financial updates.',
+    );
     return;
   }
 
@@ -91,7 +126,6 @@ async function processPayment(supabaseAdmin: SupabaseClient, payload: unknown): 
   }
 
   const totalAmount = details.amount_cents / 100;
-
   const rawSaasRevenue = totalAmount * SAAS_COMMISSION_RATE;
   const saasRevenue = Math.round(rawSaasRevenue * 100) / 100;
   const merchantRevenue = Math.round((totalAmount - saasRevenue) * 100) / 100;
@@ -109,7 +143,7 @@ async function processPayment(supabaseAdmin: SupabaseClient, payload: unknown): 
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<Response> {
   try {
     const workerSecretToken = getRequiredEnvVar('WORKER_SECRET_TOKEN');
     const authHeader = req.headers.get('authorization');
@@ -147,8 +181,13 @@ export async function POST(req: Request) {
       .single();
 
     if (fetchError || !eventData) {
-      console.info(`[Payment Worker] Event ${transactionId} not found or already processed.`);
-      return NextResponse.json({ status: 'ignored', reason: 'Not found or not pending' }, { status: 200 });
+      console.info(
+        `[Payment Worker] Event ${transactionId} not found or already processed.`,
+      );
+      return NextResponse.json(
+        { status: 'ignored', reason: 'Not found or not pending' },
+        { status: 200 },
+      );
     }
 
     const event = eventData as PaymentEvent;
@@ -162,14 +201,27 @@ export async function POST(req: Request) {
         .eq('transaction_id', transactionId);
 
       if (updateError) {
-        console.error(`[Payment Worker] Failed to mark event ${transactionId} as processed:`, updateError);
-        return NextResponse.json({ error: 'State synchronization failed' }, { status: 500 });
+        console.error(
+          `[Payment Worker] Failed to mark event ${transactionId} as processed:`,
+          updateError,
+        );
+        return NextResponse.json(
+          { error: 'State synchronization failed' },
+          { status: 500 },
+        );
       }
 
       return NextResponse.json({ success: true }, { status: 200 });
     } catch (processingError) {
-      const errorMessage = processingError instanceof Error ? processingError.message : 'Unknown processing error';
-      console.error(`[Payment Worker] Failed to process transaction ${transactionId}:`, errorMessage);
+      const errorMessage =
+        processingError instanceof Error
+          ? processingError.message
+          : 'Unknown processing error';
+
+      console.error(
+        `[Payment Worker] Failed to process transaction ${transactionId}:`,
+        errorMessage,
+      );
 
       const newRetryCount = event.retry_count + 1;
       const newStatus = newRetryCount >= MAX_RETRY_COUNT ? 'dlq' : 'pending';
@@ -184,14 +236,22 @@ export async function POST(req: Request) {
         .eq('transaction_id', transactionId);
 
       if (fallbackError) {
-        console.error(`[Payment Worker] CRITICAL: Failed to update failure state for tx ${transactionId}:`, fallbackError);
+        console.error(
+          `[Payment Worker] CRITICAL: Failed to update failure state for tx ${transactionId}:`,
+          fallbackError,
+        );
       }
 
       if (newStatus === 'dlq') {
-        console.warn(`[Payment Worker] Transaction ${transactionId} moved to Dead Letter Queue.`);
+        console.warn(
+          `[Payment Worker] Transaction ${transactionId} moved to Dead Letter Queue.`,
+        );
       }
 
-      return NextResponse.json({ error: 'Processing failed', retry: newStatus !== 'dlq' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Processing failed', retry: newStatus !== 'dlq' },
+        { status: 500 },
+      );
     }
   } catch (globalError) {
     console.error('[Payment Worker] Unhandled exception in worker route:', globalError);

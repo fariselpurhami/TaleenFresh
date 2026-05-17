@@ -1,558 +1,65 @@
-//  src/components/customer/FloatingCart.tsx
+// src/components/customer/FloatingCart.tsx
 
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  ArrowRight,
-  Banknote,
-  CheckCircle2,
-  ChevronsDown,
-  CreditCard,
-  Minus,
-  Plus,
-  ShoppingBag,
-  Trash2,
-  X,
-} from 'lucide-react'
-import { useCheckout } from '@/store/useCheckout'
-import { useCart, selectCartTotal } from '@/hooks/useCart'
-import { useHaptics } from '@/hooks/useHaptics'
-
-type PaymentMethod = 'cod' | 'card'
-
-interface OrderLineItem {
-  name: string
-  qty: number
-  price: number
-}
-
-interface OrderPayload {
-  customer_name: string
-  customer_phone: string
-  customer_address: string
-  items: OrderLineItem[]
-  total_price: number
-  status: 'pending'
-  payment_method: PaymentMethod
-}
-
-interface CheckoutApiResponse {
-  url?: string
-  error?: string
-  message?: string
-}
-
-interface PaymobPaymentResultMessage {
-  type: 'PAYMOB_PAYMENT_RESULT'
-  success: boolean
-}
-
-const DELIVERY_FEE = 25
-const FORM_VISIBILITY_THRESHOLD = 0.4
-const NETWORK_TIMEOUT_MS = 3000
-const ORDER_SUCCESS_CLOSE_DELAY_MS = 3000
-const SCROLL_STATE_CHECK_DELAY_MS = 50
-const OFFLINE_ORDERS_STORAGE_KEY = 'offline_orders'
-
-const normalizePhoneNumber = (value: string): string => {
-  return value
-    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 1632)) 
-    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 1776)) 
-    .replace(/\s+/g, '')                                             
-    .replace(/(?!^)\+/g, '')                                         
-    .replace(/[^\d+]/g, '');                                         
-};
-function isOrderLineItem(value: unknown): value is OrderLineItem {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return (
-    typeof record.name === 'string' &&
-    typeof record.qty === 'number' &&
-    typeof record.price === 'number'
-  )
-}
-
-function isOrderPayload(value: unknown): value is OrderPayload {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return (
-    typeof record.customer_name === 'string' &&
-    typeof record.customer_phone === 'string' &&
-    typeof record.customer_address === 'string' &&
-    Array.isArray(record.items) &&
-    record.items.every(isOrderLineItem) &&
-    typeof record.total_price === 'number' &&
-    record.status === 'pending' &&
-    (record.payment_method === 'cod' || record.payment_method === 'card')
-  )
-}
-
-function isPaymobPaymentResultMessage(value: unknown): value is PaymobPaymentResultMessage {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return record.type === 'PAYMOB_PAYMENT_RESULT' && typeof record.success === 'boolean'
-}
-
-function readOfflineOrders(): OrderPayload[] {
-  if (typeof window === 'undefined') return []
-
-  const raw = window.localStorage.getItem(OFFLINE_ORDERS_STORAGE_KEY)
-  if (!raw) return []
-
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed.filter(isOrderPayload) : []
-  } catch {
-    return []
-  }
-}
-
-function writeOfflineOrders(orders: OrderPayload[]) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(OFFLINE_ORDERS_STORAGE_KEY, JSON.stringify(orders))
-}
-
-function clearOfflineOrders() {
-  if (typeof window === 'undefined') return
-  window.localStorage.removeItem(OFFLINE_ORDERS_STORAGE_KEY)
-}
+import { ArrowRight, ShoppingBag, X } from 'lucide-react'
+import { useFloatingCartController } from '@/hooks/customer/useFloatingCartController'
+import { DELIVERY_FEE } from '@/lib/customer/floating-cart-utils'
+import { CartItemRow } from '@/components/customer/floating-cart/CartItemRow'
+import { CartSummaryFooter } from '@/components/customer/floating-cart/CartSummaryFooter'
+import { CheckoutForm } from '@/components/customer/floating-cart/CheckoutForm'
+import { PaymentFailureView } from '@/components/customer/floating-cart/PaymentFailureView'
+import { PaymentIframeView } from '@/components/customer/floating-cart/PaymentIframeView'
+import { SuccessView } from '@/components/customer/floating-cart/SuccessView'
 
 export function FloatingCart() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isOrdered, setIsOrdered] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
-  const [showScrollArrow, setShowScrollArrow] = useState(false)
-  const [isPaymentFailed, setIsPaymentFailed] = useState(false)
-  const [isFormVisible, setIsFormVisible] = useState(false)
-
-  const { customerInfo, setCustomerInfo } = useCheckout()
-  const items = useCart((state) => state.items)
-  const updateQty = useCart((state) => state.updateQty)
-  const clearCart = useCart((state) => state.clearCart)
-  const removeItem = useCart((state) => state.removeItem)
-  const hasHydrated = useCart((state) => state._hasHydrated)
-  const cartTotal = useCart(selectCartTotal)
-  const { trigger } = useHaptics()
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const addressRef = useRef<HTMLTextAreaElement>(null)
-  const formContainerRef = useRef<HTMLDivElement>(null)
-  const successTimeoutRef = useRef<number | null>(null)
-  const scrollStateTimeoutRef = useRef<number | null>(null)
-
-  const finalTotal = useMemo(
-    () => (cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0),
-    [cartTotal]
-  )
-
-  const isMissingInputs = useMemo(
-    () =>
-      !customerInfo.name.trim() ||
-      !customerInfo.phone.trim() ||
-      !customerInfo.address.trim(),
-    [customerInfo.address, customerInfo.name, customerInfo.phone]
-  )
-
-  const isMissingPayment = paymentMethod === null
-  const isFormIncomplete = isMissingInputs || isMissingPayment
-  const firstCustomerName = useMemo(() => {
-    const firstPart = customerInfo.name.trim().split(/\s+/)[0]
-    return firstPart || 'عميلنا'
-  }, [customerInfo.name])
-
-  const showScrollHint = useMemo(
-    () =>
-      showScrollArrow &&
-      isFormIncomplete &&
-      ((isMissingInputs && !isFormVisible) || (!isMissingInputs && isMissingPayment)),
-    [isFormIncomplete, isFormVisible, isMissingInputs, isMissingPayment, showScrollArrow]
-  )
-
-  const clearSuccessTimeout = useCallback(() => {
-    if (successTimeoutRef.current !== null) {
-      window.clearTimeout(successTimeoutRef.current)
-      successTimeoutRef.current = null
-    }
-  }, [])
-
-  const clearScrollStateTimeout = useCallback(() => {
-    if (scrollStateTimeoutRef.current !== null) {
-      window.clearTimeout(scrollStateTimeoutRef.current)
-      scrollStateTimeoutRef.current = null
-    }
-  }, [])
-
-  const resetCheckoutState = useCallback(() => {
-    setIsSubmitting(false)
-    setIsOrdered(false)
-    setPaymentUrl(null)
-    setErrorMsg('')
-    setIsPaymentFailed(false)
-  }, [])
-
-  const resetCustomerState = useCallback(() => {
-    setPaymentMethod(null)
-  }, [])
-
-  const resetPaymentFlow = useCallback(() => {
-    setPaymentUrl(null)
-    setIsPaymentFailed(false)
-    setIsSubmitting(false)
-    setErrorMsg('')
-  }, [])
-
-  const closeCart = useCallback(() => {
-    clearSuccessTimeout()
-    clearScrollStateTimeout()
-    setIsOpen(false)
-  }, [clearScrollStateTimeout, clearSuccessTimeout])
-
-  const enqueueOfflineOrder = useCallback((orderData: OrderPayload) => {
-    const existingOrders = readOfflineOrders()
-    writeOfflineOrders([...existingOrders, orderData])
-  }, [])
-
-  const processOfflineQueue = useCallback(async () => {
-    if (typeof window === 'undefined' || !navigator.onLine) return
-
-    const queuedOrders = readOfflineOrders()
-    if (queuedOrders.length === 0) return
-
-    const remainingOrders: OrderPayload[] = []
-
-    for (const order of queuedOrders) {
-      try {
-        const response = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(order),
-        })
-
-        if (!response.ok && response.status >= 500) {
-          remainingOrders.push(order)
-        }
-      } catch {
-        remainingOrders.push(order)
-      }
-    }
-
-    if (remainingOrders.length === 0) {
-      clearOfflineOrders()
-    } else {
-      writeOfflineOrders(remainingOrders)
-    }
-  }, [])
-
-  const completeLocalSuccessFlow = useCallback(() => {
-    clearSuccessTimeout()
-    trigger('success')
-    setIsOrdered(true)
-    setIsSubmitting(false)
-    setPaymentUrl(null)
-    setErrorMsg('')
-    setIsPaymentFailed(false)
-
-    successTimeoutRef.current = window.setTimeout(() => {
-      clearCart()
-      setIsOpen(false)
-      resetCheckoutState()
-      resetCustomerState()
-    }, ORDER_SUCCESS_CLOSE_DELAY_MS)
-  }, [clearCart, clearSuccessTimeout, resetCheckoutState, resetCustomerState, trigger])
-
-  const checkScrollState = useCallback(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const { scrollTop, scrollHeight, clientHeight } = container
-    const hasScrollableContent = scrollHeight > clientHeight
-    const isNearBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 20
-
-    setShowScrollArrow(hasScrollableContent && !isNearBottom)
-  }, [])
-
-  const buildOrderPayload = useCallback((): OrderPayload => {
-    return {
-      customer_name: customerInfo.name.trim(),
-      customer_phone: customerInfo.phone.trim(),
-      customer_address: customerInfo.address.trim(),
-      items: items.map((item) => ({
-        name: item.name,
-        qty: item.qty,
-        price: item.price,
-      })),
-      total_price: finalTotal,
-      status: 'pending',
-      payment_method: paymentMethod as PaymentMethod,
-    }
-  }, [customerInfo.address, customerInfo.name, customerInfo.phone, finalTotal, items, paymentMethod])
-
-  const handleCodCheckout = useCallback(
-    async (orderData: OrderPayload) => {
-      if (!navigator.onLine) {
-        enqueueOfflineOrder(orderData)
-        completeLocalSuccessFlow()
-        return
-      }
-
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS)
-
-      try {
-        const response = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(orderData),
-          signal: controller.signal,
-        })
-
-        const data = await response.json().catch(() => null)
-
-        if (!response.ok) {
-          if (response.status === 409) throw new Error('PRICE_MISMATCH')
-          throw new Error(data?.error || 'فشل تسجيل الطلب')
-        }
-
-        completeLocalSuccessFlow()
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع'
-
-        if (error instanceof Error && error.name === 'AbortError') {
-          enqueueOfflineOrder(orderData)
-          completeLocalSuccessFlow()
-          return
-        }
-
-        if (message === 'PRICE_MISMATCH') {
-          setErrorMsg('عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.')
-        } else {
-          setErrorMsg('عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.')
-        }
-
-        setIsSubmitting(false)
-        trigger('error')
-      } finally {
-        window.clearTimeout(timeoutId)
-      }
-    },
-    [completeLocalSuccessFlow, enqueueOfflineOrder, trigger]
-  )
-
-  const handleCardCheckout = useCallback(async (orderData: OrderPayload) => {
-    const response = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderData),
-    })
-
-    const data = (await response.json().catch(() => null)) as CheckoutApiResponse | null
-
-    if (!response.ok) {
-      if (response.status === 409) throw new Error('PRICE_MISMATCH')
-      throw new Error(data?.error || data?.message || 'Payment initialization failed')
-    }
-
-    if (!data?.url) {
-      throw new Error('Payment URL was not returned from the server')
-    }
-
-    setPaymentUrl(data.url)
-    setIsSubmitting(false)
-  }, [])
-
-  const handleCheckout = useCallback(async () => {
-    if (items.length === 0 || isSubmitting) return
-
-    if (isFormIncomplete) {
-      trigger('medium')
-      formContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      return
-    }
-
-    const orderData = buildOrderPayload()
-
-    setIsSubmitting(true)
-    setErrorMsg('')
-    trigger('medium')
-
-    try {
-      if (orderData.payment_method === 'card') {
-        await handleCardCheckout(orderData)
-        return
-      }
-
-      await handleCodCheckout(orderData)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع أثناء تنفيذ العملية'
-
-      if (message === 'PRICE_MISMATCH') {
-        setErrorMsg('عذراً، بعض المنتجات في سلتك لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.')
-      } else {
-        setErrorMsg(message)
-      }
-
-      setIsSubmitting(false)
-      trigger('error')
-    }
-  }, [
-    buildOrderPayload,
-    handleCardCheckout,
-    handleCodCheckout,
-    isFormIncomplete,
+  const {
+    isOpen,
+    isMounted,
     isSubmitting,
-    items.length,
-    trigger,
-  ])
-
-  useEffect(() => {
-    return () => {
-      clearSuccessTimeout()
-      clearScrollStateTimeout()
-      document.body.style.overflow = ''
-    }
-  }, [clearScrollStateTimeout, clearSuccessTimeout])
-
-  useEffect(() => {
-    if (!isOpen || items.length === 0) {
-      setIsFormVisible(false)
-      return
-    }
-
-    const targetNode = formContainerRef.current
-    const rootNode = scrollContainerRef.current
-
-    if (!targetNode) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries
-        setIsFormVisible(Boolean(entry?.isIntersecting))
-      },
-      {
-        root: rootNode,
-        threshold: FORM_VISIBILITY_THRESHOLD,
-      }
-    )
-
-    observer.observe(targetNode)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [isOpen, items.length])
-
-  useEffect(() => {
-    void processOfflineQueue()
-
-    const scheduleOfflineSync = () => {
-      window.requestAnimationFrame(() => {
-        void processOfflineQueue()
-      })
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        scheduleOfflineSync()
-      }
-    }
-
-    window.addEventListener('online', scheduleOfflineSync)
-    window.addEventListener('focus', scheduleOfflineSync)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      window.removeEventListener('online', scheduleOfflineSync)
-      window.removeEventListener('focus', scheduleOfflineSync)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [processOfflineQueue])
-
-  useEffect(() => {
-    setIsMounted(true)
-
-    const handleOpenCart = () => {
-      trigger('medium')
-      setIsOpen(true)
-    }
-
-    window.addEventListener('open-cart', handleOpenCart as EventListener)
-
-    return () => {
-      window.removeEventListener('open-cart', handleOpenCart as EventListener)
-    }
-  }, [trigger])
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-      return
-    }
-
-    document.body.style.overflow = ''
-    clearSuccessTimeout()
-    clearScrollStateTimeout()
-    resetCheckoutState()
-  }, [clearScrollStateTimeout, clearSuccessTimeout, isOpen, resetCheckoutState])
-
-  useEffect(() => {
-    clearScrollStateTimeout()
-
-    if (isOpen && !paymentUrl) {
-      scrollStateTimeoutRef.current = window.setTimeout(
-        checkScrollState,
-        SCROLL_STATE_CHECK_DELAY_MS
-      )
-      return clearScrollStateTimeout
-    }
-
-    setShowScrollArrow(false)
-  }, [checkScrollState, clearScrollStateTimeout, isOpen, items, paymentUrl])
-
-  useEffect(() => {
-    const textarea = addressRef.current
-    if (!textarea) return
-
-    textarea.style.height = 'auto'
-    textarea.style.height = `${textarea.scrollHeight}px`
-  }, [customerInfo.address])
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
-      if (!isPaymobPaymentResultMessage(event.data)) return
-
-      if (event.data.success) {
-        completeLocalSuccessFlow()
-        return
-      }
-
-      setPaymentUrl(null)
-      setIsSubmitting(false)
-      setIsPaymentFailed(true)
-      setErrorMsg(
-        'عذراً، فشلت عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار الدفع عند الاستلام.'
-      )
-      trigger('error')
-    }
-
-    window.addEventListener('message', handleMessage)
-
-    return () => {
-      window.removeEventListener('message', handleMessage)
-    }
-  }, [completeLocalSuccessFlow, trigger])
+    isOrdered,
+    paymentUrl,
+    paymentMethod,
+    showScrollHint,
+    isPaymentFailed,
+    customerInfo,
+    items,
+    hasHydrated,
+    cartTotal,
+    finalTotal,
+    isFormIncomplete,
+    firstCustomerName,
+    scrollContainerRef,
+    addressRef,
+    formContainerRef,
+    setCustomerInfo,
+    setPaymentMethod,
+    closeCart,
+    resetPaymentFlow,
+    retryAfterPaymentFailure,
+    removeItem,
+    updateQty,
+    handleCheckout,
+    checkScrollState,
+    normalizePhoneNumber,
+    errorMsg,
+  } = useFloatingCartController()
 
   if (!isMounted || !hasHydrated) return null
 
+  const checkoutButtonLabel = isSubmitting
+    ? 'جاري المعالجة...'
+    : paymentMethod === null
+      ? 'اختر طريقة الدفع'
+      : paymentMethod === 'card'
+        ? 'تأكيد الدفع'
+        : 'تأكيد الطلب'
+
   return (
     <AnimatePresence>
-      {isOpen && (
+      {isOpen ? (
         <>
           <motion.div
             key="backdrop"
@@ -566,18 +73,20 @@ export function FloatingCart() {
 
           <motion.div
             data-testid="cart-container"
-            initial={{ y: '100%', x: '-50%', opacity: 0.98 }}
+            initial={{ y: 100, x: '-50%', opacity: 0.98 }}
             animate={{ y: 0, x: '-50%', opacity: 1 }}
-            exit={{ y: '100%', x: '-50%', opacity: 0.98 }}
+            exit={{ y: 100, x: '-50%', opacity: 0.98 }}
             transition={{
               y: { type: 'spring', damping: 30, stiffness: 320, mass: 0.5 },
               opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
-              layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+              layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
             }}
             layout
             style={{ willChange: 'transform, opacity' }}
-            className={`fixed bottom-0 left-[50%] z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none ${
-              paymentUrl || isPaymentFailed ? 'h-[80vh] max-h-[80vh]' : 'h-auto max-h-[80vh]'
+            className={`fixed bottom-0 left-1/2 z-[70] flex w-full max-w-[430px] flex-col overflow-hidden rounded-t-3xl border-none bg-white shadow-2xl outline-none ${
+              paymentUrl || isPaymentFailed
+                ? 'h-[80vh] max-h-[80vh]'
+                : 'h-auto max-h-[80vh]'
             }`}
           >
             <div className="z-10 flex shrink-0 items-center justify-between border-b bg-white px-6 py-4">
@@ -589,14 +98,14 @@ export function FloatingCart() {
                     className="flex items-center gap-2 text-gray-600 transition-colors hover:text-gray-900"
                   >
                     <ArrowRight className="h-5 w-5" />
-                    رجوع
+                    <span>رجوع</span>
                   </button>
                 ) : isOrdered ? (
                   <span className="text-[#2C643E]">الطلب مكتمل</span>
                 ) : (
                   <>
                     <ShoppingBag className="h-6 w-6 text-[#2C643E]" />
-                    سلة المشتريات
+                    <span>سلة المشتريات</span>
                   </>
                 )}
               </div>
@@ -614,88 +123,11 @@ export function FloatingCart() {
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
               <AnimatePresence mode="wait">
                 {paymentUrl ? (
-                  <motion.div
-                    key="iframe-view"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="relative flex-1 w-full overflow-hidden bg-white p-0"
-                  >
-                    <div className="absolute inset-0 flex items-center justify-center bg-[#f8fafc]">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#2C643E] border-t-transparent" />
-                        <p className="text-sm font-bold text-gray-500">
-                          جاري تحميل بوابة الدفع...
-                        </p>
-                      </div>
-                    </div>
-                    <iframe
-                      src={paymentUrl}
-                      className="relative z-10 m-0 block h-full w-full border-none p-0"
-                      style={{ height: '100%', width: '100%', marginTop: '-5px' }}
-                      allow="payment"
-                      title="بوابة الدفع"
-                    />
-                  </motion.div>
+                  <PaymentIframeView paymentUrl={paymentUrl} />
                 ) : isPaymentFailed ? (
-                  <motion.div
-                    key="failure-view"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.3 }}
-                    className="flex w-full flex-1 flex-col items-center justify-center bg-white p-6 text-center"
-                  >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-                      className="mb-6 rounded-full bg-red-50 p-6"
-                    >
-                      <X className="h-16 w-16 text-red-500" strokeWidth={2} />
-                    </motion.div>
-                    <h3 className="mb-3 text-2xl font-bold text-gray-800">فشلت عملية الدفع</h3>
-                    <p className="mb-10 max-w-[280px] text-sm font-medium text-gray-500">
-                      عذراً، لم نتمكن من إتمام عملية الدفع. يرجى التحقق من بيانات البطاقة أو
-                      المحاولة باختيار طريقة الدفع عند الاستلام.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPaymentFailed(false)
-                        setIsSubmitting(false)
-                      }}
-                      className="w-full max-w-[250px] rounded-2xl bg-gray-100 px-6 py-4 text-base font-black text-gray-800 transition-all hover:bg-gray-200 active:scale-95"
-                    >
-                      العودة للمحاولة
-                    </button>
-                  </motion.div>
+                  <PaymentFailureView onRetry={retryAfterPaymentFailure} />
                 ) : isOrdered ? (
-                  <motion.div
-                    key="success-view"
-                    data-testid="order-success-view"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.3 }}
-                    className="flex w-full flex-col items-center justify-center bg-white p-10 text-center"
-                  >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-                    >
-                      <CheckCircle2 className="mb-6 h-24 w-24 text-green-500" strokeWidth={1.5} />
-                    </motion.div>
-                    <h3 className="mb-2 text-2xl font-bold text-gray-800">تم استلام طلبك!</h3>
-                    <p
-                      data-testid="order-success-message"
-                      className="font-medium text-gray-500"
-                    >
-                      جاري التجهيز الآن يا {firstCustomerName}
-                    </p>
-                  </motion.div>
+                  <SuccessView firstCustomerName={firstCustomerName} />
                 ) : (
                   <motion.div
                     key="cart-view"
@@ -715,8 +147,15 @@ export function FloatingCart() {
                           <div className="rounded-full bg-gray-50 p-6">
                             <ShoppingBag className="h-16 w-16 text-gray-300" />
                           </div>
-                          <h3 className="text-xl font-bold text-gray-800">سلتك فارغة</h3>
-                          <p className="text-gray-500">لم تقم بإضافة أي منتجات حتى الآن.</p>
+
+                          <h3 className="text-xl font-bold text-gray-800">
+                            سلتك فارغة
+                          </h3>
+
+                          <p className="text-gray-500">
+                            لم تقم بإضافة أي منتجات حتى الآن.
+                          </p>
+
                           <button
                             type="button"
                             onClick={closeCart}
@@ -728,224 +167,52 @@ export function FloatingCart() {
                       ) : (
                         <>
                           <div className="space-y-3">
-                            {items.map((item) => {
-                              const isGrapeLeaves = item.name.includes('عنب')
-                              const itemCategory = (item as { category?: string }).category
-                              const unit =
-                                itemCategory === 'leaf_greens' && !isGrapeLeaves ? 'حزمة' : 'كجم'
-                              const step = unit === 'حزمة' ? 1 : 0.5
-                              const minQty = unit === 'حزمة' ? 1 : 0.5
-
-                              return (
-                                <div
-                                  key={item.id}
-                                  className="flex items-center justify-between gap-3 rounded-2xl border p-3"
-                                >
-                                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                                    <h4 className="truncate text-sm font-bold text-gray-800">
-                                      {item.name}
-                                    </h4>
-                                    <span className="shrink-0 rounded-md bg-green-50 px-2 py-0.5 text-xs font-bold text-[#2C643E]">
-                                      {(item.price * item.qty).toFixed(2)} ج.م
-                                    </span>
-                                  </div>
-
-                                  <div className="flex shrink-0 items-center gap-2" dir="ltr">
-                                    <div className="flex items-center gap-1 rounded-lg border bg-gray-50 p-0.5">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          updateQty(item.id, Math.max(minQty, item.qty - step))
-                                        }
-                                        aria-label={`تقليل كمية ${item.name}`}
-                                        className="rounded-md p-1.5 text-gray-600 transition-colors hover:bg-gray-200"
-                                      >
-                                        <Minus className="h-3.5 w-3.5" />
-                                      </button>
-                                      <span className="w-14 text-center text-sm font-bold text-gray-700">
-                                        {item.qty} {unit}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => updateQty(item.id, item.qty + step)}
-                                        aria-label={`زيادة كمية ${item.name}`}
-                                        className="rounded-md bg-white p-1.5 text-[#2C643E] shadow-sm transition-colors hover:bg-green-50"
-                                      >
-                                        <Plus className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => removeItem(item.id)}
-                                      aria-label={`حذف ${item.name}`}
-                                      className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              )
-                            })}
+                            {items.map((item) => (
+                              <CartItemRow
+                                key={item.id}
+                                item={item}
+                                updateQty={updateQty}
+                                removeItem={removeItem}
+                              />
+                            ))}
                           </div>
 
-                          <div
-                            id="delivery-form"
-                            ref={formContainerRef}
-                            className="mt-6 space-y-4 border-t pt-6"
-                          >
-                            {errorMsg && (
-                              <div
-                                className="rounded-xl border border-red-100 bg-red-50 p-3 text-right text-sm font-bold text-red-600"
-                                dir="rtl"
-                              >
-                                {errorMsg}
-                              </div>
-                            )}
-
-                            <h3 className="w-full text-center text-lg font-bold text-gray-800">
-                              الرجاء إدخال بياناتك
-                            </h3>
-
-                            <input
-                              data-testid="input-customer-name"
-                              type="text"
-                              placeholder="الاسم الثلاثي"
-                              value={customerInfo.name}
-                              onChange={(event) =>
-                                setCustomerInfo({ name: event.target.value })
-                              }
-                              disabled={isSubmitting}
-                              className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
-                              dir="rtl"
-                            />
-
-                            <input
-                              data-testid="input-customer-phone"
-                              type="tel"
-                              placeholder="رقم الهاتف"
-                              value={customerInfo.phone}
-                              onChange={(event) =>
-                                setCustomerInfo({ phone: normalizePhoneNumber(event.target.value) })
-                              }
-                              disabled={isSubmitting}
-                              className="w-full rounded-xl border bg-gray-50 px-4 py-3 text-right outline-none focus:border-[#2C643E] focus:bg-white"
-                              dir="rtl"
-                            />
-
-                            <textarea
-                              data-testid="input-customer-address"
-                              ref={addressRef}
-                              rows={1}
-                              placeholder="العنوان بالتفصيل (المنطقة، الشارع، العمارة)"
-                              value={customerInfo.address}
-                              onChange={(event) =>
-                                setCustomerInfo({ address: event.target.value })
-                              }
-                              disabled={isSubmitting}
-                              className="max-h-[120px] w-full resize-none overflow-y-auto rounded-xl border bg-gray-50 px-4 py-3 text-right leading-relaxed outline-none focus:border-[#2C643E] focus:bg-white"
-                              dir="rtl"
-                            />
-                          </div>
-
-                          <div className="mb-2 mt-6 space-y-4 border-t pt-6">
-                            <h3 className="w-full text-center text-lg font-bold text-gray-800">
-                              طريقة الدفع
-                            </h3>
-                            <div className="grid grid-cols-2 gap-3" dir="rtl">
-                              <button
-                                type="button"
-                                data-testid="payment-method-card"
-                                onClick={() => setPaymentMethod('card')}
-                                disabled={true}
-                                className="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/40 p-4 text-gray-400 opacity-60 cursor-not-allowed select-none"
-                              >
-                                
-                                <span className="absolute right-2 top-2 rounded-md bg-gray-200/70 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-gray-500">
-                                  قريباً
-                                </span>
-                                <CreditCard className="h-6 w-6" />
-                                <span className="text-sm font-bold">بطاقة بنكية</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                data-testid="payment-method-cod"
-                                onClick={() => setPaymentMethod('cod')}
-                                disabled={isSubmitting}
-                                className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition-all ${
-                                  paymentMethod === 'cod'
-                                    ? 'border-[#2C643E] bg-green-50 text-[#2C643E]'
-                                    : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'
-                                }`}
-                              >
-                                <Banknote className="h-6 w-6" />
-                                <span className="text-sm font-bold">عند الاستلام</span>
-                              </button>
-                            </div>
-                          </div>
+                          <CheckoutForm
+                            errorMsg={errorMsg}
+                            isSubmitting={isSubmitting}
+                            customerInfo={customerInfo}
+                            paymentMethod={paymentMethod}
+                            formContainerRef={formContainerRef}
+                            addressRef={addressRef}
+                            setCustomerInfo={setCustomerInfo}
+                            setPaymentMethod={setPaymentMethod}
+                            normalizePhoneNumber={normalizePhoneNumber}
+                          />
                         </>
                       )}
                     </div>
 
-                    {items.length > 0 && (
-                      <div className="relative shrink-0 border-t bg-white px-6 py-4 pb-safe">
-                        <AnimatePresence>
-                          {showScrollHint && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 10 }}
-                              className="absolute -top-12 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/80 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-sm"
-                            >
-                              مرر لإستكمال الدفع
-                              <ChevronsDown className="h-4 w-4 animate-bounce" />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-
-                        <div className="mb-4 space-y-2 text-sm text-gray-600" dir="rtl">
-                          <div className="flex justify-between">
-                            <span>المجموع</span>
-                            <span className="font-bold">{cartTotal.toFixed(2)} ج.م</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>رسوم التوصيل</span>
-                            <span className="font-bold">{DELIVERY_FEE.toFixed(2)} ج.م</span>
-                          </div>
-                          <div className="flex justify-between border-t pt-2 text-lg font-black text-gray-800">
-                            <span>الإجمالي</span>
-                            <span>{finalTotal.toFixed(2)} ج.م</span>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          data-testid="checkout-submit-button"
-                          onClick={() => {
-                            void handleCheckout()
-                          }}
-                          disabled={isSubmitting}
-                          className={`flex w-full items-center justify-center rounded-2xl bg-[#2C643E] py-4 text-lg font-black text-white shadow-[0_8px_20px_rgba(44,100,62,0.3)] transition-all ${
-                            isFormIncomplete || isSubmitting ? 'opacity-50' : 'active:scale-[0.98]'
-                          }`}
-                        >
-                          {isSubmitting
-                            ? 'جاري المعالجة...'
-                            : paymentMethod === null
-                              ? 'اختر طريقة الدفع'
-                              : paymentMethod === 'card'
-                                ? 'تأكيد الدفع'
-                                : 'تأكيد الطلب'}
-                        </button>
-                      </div>
-                    )}
+                    {items.length > 0 ? (
+                      <CartSummaryFooter
+                        cartTotal={cartTotal}
+                        finalTotal={finalTotal}
+                        deliveryFee={DELIVERY_FEE}
+                        showScrollHint={showScrollHint}
+                        isFormIncomplete={isFormIncomplete}
+                        isSubmitting={isSubmitting}
+                        paymentMethodLabel={checkoutButtonLabel}
+                        onCheckout={() => {
+                          void handleCheckout()
+                        }}
+                      />
+                    ) : null}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </motion.div>
         </>
-      )}
+      ) : null}
     </AnimatePresence>
   )
 }
