@@ -70,10 +70,16 @@ const isValidCheckoutPayload = (payload: unknown): payload is CheckoutPayload =>
   if (!Array.isArray(p.items) || p.items.length === 0 || p.items.length > MAX_PAYLOAD_ITEMS) return false;
 
   for (const item of p.items) {
-    if (!item || typeof item !== 'object') return false;
-    if (typeof item.name !== 'string' || !item.name.trim() || item.name.length > 200) return false;
-    if (typeof item.qty !== 'number' || !Number.isInteger(item.qty) || item.qty <= 0 || item.qty > MAX_QTY_PER_ITEM) return false;
-  }
+  if (item === null || typeof item !== 'object' || Array.isArray(item)) return false;
+
+  const { name, qty } = item as { name?: unknown; qty?: unknown };
+
+  if (typeof name !== 'string') return false;
+  const normalizedName = name.trim();
+  if (normalizedName.length === 0 || normalizedName.length > 200) return false;
+
+  if (typeof qty !== 'number' || !Number.isFinite(qty) || qty <= 0 || qty > MAX_QTY_PER_ITEM) return false;
+}
 
   return true;
 };

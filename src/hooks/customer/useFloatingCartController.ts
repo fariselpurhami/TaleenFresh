@@ -361,6 +361,20 @@ export function useFloatingCartController(): FloatingCartController {
       return
     }
 
+    const normalizedPhone = customerInfo.phone.replace(/[^\d+]/g, '');
+    const digitCount = normalizedPhone.replace(/\D/g, '').length;
+
+    if (digitCount < 10) {
+      setErrorMsg('برجاء إدخال رقم هاتف صحيح (١٠ أرقام على الأقل)');
+      trigger('error');
+      formContainerRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
+      });
+      return;
+    }
+
     const orderData = buildOrderPayload()
 
     setIsSubmitting(true)
