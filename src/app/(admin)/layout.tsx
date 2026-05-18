@@ -1,31 +1,43 @@
 // src/app/(admin)/layout.tsx
 
-import React, { ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import type { Metadata } from 'next';
 import { AdminOrdersProvider } from '@/providers/AdminOrdersProvider';
 import { OrderRadar } from '@/components/admin/OrderRadar';
-import type { Metadata } from 'next';
-
 
 export const metadata: Metadata = {
   title: 'TaleenFresh Admin Dashboard',
   description: 'لوحة تحكم تالين فريش',
   manifest: '/admin-manifest.json?v=1',
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'none',
+      'max-snippet': -1,
+    },
+  },
 };
 
 interface AdminLayoutProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <AdminOrdersProvider initialOrders={[]}>
       <OrderRadar />
-      <div
-        className="min-h-screen bg-gray-50 text-gray-900"
+      <main
+        className="flex min-h-[100dvh] w-full flex-col bg-slate-50 text-slate-900 antialiased selection:bg-emerald-600 selection:text-white"
         dir="rtl"
       >
         {children}
-      </div>
+      </main>
     </AdminOrdersProvider>
   );
 }
