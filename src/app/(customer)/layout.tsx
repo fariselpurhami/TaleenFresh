@@ -80,6 +80,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
 	  
         </div>
       </main>
+      
     </div>
   );
 }

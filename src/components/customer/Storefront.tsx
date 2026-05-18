@@ -108,7 +108,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
   }, [])
 
   return (
-    <div dir="rtl" className="relative min-h-[100dvh] overflow-hidden bg-transparent pb-24">
+    <div dir="rtl" className="relative min-h-[100dvh] bg-transparent pb-24">
       <header className="flex items-center justify-between px-6 pb-1 pt-0">
         <div className="flex items-center gap-3">
           <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white p-0.5 shadow-md">
@@ -232,7 +232,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-40 mx-auto w-full max-w-[340px] px-2">
-        <div className="flex h-20 items-center justify-between rounded-[2.5rem] border border-gray-100/80 bg-white/90 px-5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md">
+        <div className="pointer-events-auto flex h-20 items-center justify-between rounded-[2.5rem] border border-gray-100/80 bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
           <button type="button" className="flex flex-col items-center gap-1 text-[#2C643E]">
             <Home size={24} strokeWidth={2.5} aria-hidden="true" />
             <span className="text-[10px] font-bold">الرئيسية</span>
