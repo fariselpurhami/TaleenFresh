@@ -2,6 +2,7 @@
 
 import type { Metadata } from 'next';
 import '@/app/globals.css';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
   title: {
@@ -22,10 +23,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // 👇 السر كله في الكلمة دي suppressHydrationWarning
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body className="antialiased">
         {children}
+	<Analytics />
       </body>
     </html>
   );
