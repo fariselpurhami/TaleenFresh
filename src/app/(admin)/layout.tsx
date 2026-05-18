@@ -3,6 +3,14 @@
 import React, { ReactNode } from 'react';
 import { AdminOrdersProvider } from '@/providers/AdminOrdersProvider';
 import { OrderRadar } from '@/components/admin/OrderRadar';
+import type { Metadata } from 'next';
+
+
+export const metadata: Metadata = {
+  title: 'TaleenFresh Admin Dashboard',
+  description: 'لوحة تحكم تالين فريش',
+  manifest: '/admin-manifest.json?v=1',
+};
 
 interface AdminLayoutProps {
   children: ReactNode;

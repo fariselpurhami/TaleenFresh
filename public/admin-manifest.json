@@ -1,0 +1,31 @@
+{
+  "id": "/admin",
+  "name": "TaleenFresh Admin",
+  "short_name": "TaleenFresh Admin",
+  "description": "لوحة تحكم تالين فريش",
+  "dir": "rtl",
+  "lang": "ar-EG",
+  "start_url": "/admin/?utm_source=pwa",
+  "scope": "/admin/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#2C643E",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "الطلبات الحديثة",
+      "short_name": "الطلبات",
+      "description": "مراجعة وإدارة الطلبات",
+      "url": "/admin/orders"
+    }
+  ]
+}
