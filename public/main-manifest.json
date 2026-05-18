@@ -1,0 +1,108 @@
+{
+  "id": "/",
+  "name": "Taleen Fresh | تالين فريش",
+  "short_name": "TaleenFresh",
+  "description": "أجود أنواع الخضار والفاكهة طازة لحد باب بيتك",
+  "lang": "ar-EG",
+  "dir": "rtl",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "orientation": "portrait-primary",
+  "background_color": "#f9fafb",
+  "theme_color": "#16a34a",
+  "categories": [
+    "food",
+    "shopping",
+    "lifestyle"
+  ],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home-mobile.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "الصفحة الرئيسية على الجوال"
+    },
+    {
+      "src": "/screenshots/home-desktop.png",
+      "sizes": "1440x1024",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "الصفحة الرئيسية على سطح المكتب"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "العروض اليومية",
+      "short_name": "العروض",
+      "description": "تصفح أحدث العروض والخصومات",
+      "url": "/offers",
+      "icons": [
+        {
+          "src": "/icons/shortcut-offers-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "السلة",
+      "short_name": "السلة",
+      "description": "الانتقال مباشرة إلى سلة المشتريات",
+      "url": "/cart",
+      "icons": [
+        {
+          "src": "/icons/shortcut-cart-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "تتبع الطلب",
+      "short_name": "طلبي",
+      "description": "متابعة حالة الطلب الحالي",
+      "url": "/orders/current",
+      "icons": [
+        {
+          "src": "/icons/shortcut-order-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

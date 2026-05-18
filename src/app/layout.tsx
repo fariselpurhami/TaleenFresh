@@ -25,6 +25,7 @@ export const metadata: Metadata = {
   },
   description: 'مُنتجات طازجة تُقطف بعناية لتصلك بأعلى جودة.',
   applicationName: 'TaleenFresh',
+  manifest: '/main-manifest.json',
   appleWebApp: {
     capable: true,
     title: 'TaleenFresh',
