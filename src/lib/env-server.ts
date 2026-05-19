@@ -25,6 +25,7 @@ const serverSchema = z.object({
   SENTRY_AUTH_TOKEN: z.string().optional(),
   SENTRY_DSN: z.string().url().optional(),
   WORKER_SECRET_TOKEN: z.string().min(1, 'Worker Token is required'),
+  ADMIN_PROVISIONING_KEY: z.string().min(1, "Provisioning key is required"),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;

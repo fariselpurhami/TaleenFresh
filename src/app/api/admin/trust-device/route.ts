@@ -2,8 +2,8 @@
 
 import { NextResponse } from 'next/server';
 import { envServer } from '@/lib/env-server';
-import { applyNoStoreHeaders } from '@/lib/security/headers';
 import { buildTrustedDeviceCookieValue, TRUST_COOKIE_NAME, TRUST_COOKIE_PATH, TRUST_COOKIE_TTL_SECONDS } from '@/lib/security/device-trust';
+import { applyNoStoreHeaders } from '@/lib/security/headers';
 import { safeEqual } from '@/lib/security/safe-compare';
 
 const PROVISIONING_PARAM = 'key';

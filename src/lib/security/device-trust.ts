@@ -1,13 +1,32 @@
 // src/lib/security/device-trust.ts
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 export const TRUST_COOKIE_NAME = '__Host-taleenfresh_device_trust';
 export const TRUST_COOKIE_TTL_SECONDS = 60 * 60 * 24 * 30;
 export const TRUST_COOKIE_PATH = '/';
 
+function toArrayBuffer(value: ArrayBufferLike): ArrayBuffer {
+  if (value instanceof ArrayBuffer) {
+    return value;
+  }
+
+  const view = new Uint8Array(value);
+  const copy = new Uint8Array(view.byteLength);
+  copy.set(view);
+  return copy.buffer;
+}
+
+function toExactArrayBuffer(view: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(view.byteLength);
+  copy.set(view);
+  return copy.buffer;
+}
+
 function base64UrlEncodeBytes(bytes: Uint8Array): string {
   let binary = '';
+
   for (let index = 0; index < bytes.length; index += 1) {
     binary += String.fromCharCode(bytes[index]);
   }
@@ -29,8 +48,7 @@ function base64UrlDecodeToBytes(base64Url: string): Uint8Array {
 }
 
 function decodeBase64UrlToString(base64Url: string): string {
-  const bytes = base64UrlDecodeToBytes(base64Url);
-  return new TextDecoder().decode(bytes);
+  return decoder.decode(toExactArrayBuffer(base64UrlDecodeToBytes(base64Url)));
 }
 
 function extractKeyVersion(secret: string): string {
@@ -41,7 +59,7 @@ function extractKeyVersion(secret: string): string {
 async function importHmacKey(secret: string, usages: KeyUsage[]): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
-    encoder.encode(secret),
+    toExactArrayBuffer(encoder.encode(secret)),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     usages,
@@ -54,8 +72,8 @@ export async function buildTrustedDeviceCookieValue(secret: string): Promise<str
   const payload = `${keyVersion}.${issuedAt}`;
   const payloadBytes = encoder.encode(payload);
   const cryptoKey = await importHmacKey(secret, ['sign']);
-  const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, payloadBytes);
-  const signatureBytes = new Uint8Array(signatureBuffer);
+  const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, toExactArrayBuffer(payloadBytes));
+  const signatureBytes = new Uint8Array(toArrayBuffer(signatureBuffer));
   const encodedPayload = base64UrlEncodeBytes(payloadBytes);
   const encodedSignature = base64UrlEncodeBytes(signatureBytes);
 
@@ -82,7 +100,12 @@ export async function verifyTrustedDeviceCookie(cookieValue: string, secret: str
     const payloadBytes = encoder.encode(payloadString);
     const signatureBytes = base64UrlDecodeToBytes(encodedSignature);
     const cryptoKey = await importHmacKey(secret, ['verify']);
-    const isValidSignature = await crypto.subtle.verify('HMAC', cryptoKey, signatureBytes, payloadBytes);
+    const isValidSignature = await crypto.subtle.verify(
+      'HMAC',
+      cryptoKey,
+      toExactArrayBuffer(signatureBytes),
+      toExactArrayBuffer(payloadBytes),
+    );
 
     if (!isValidSignature) {
       return false;
