@@ -13,16 +13,13 @@ import type {
   PaymentMethod,
 } from '@/types/customer/floating-cart'
 import {
-  clearOfflineOrders,
   DELIVERY_FEE,
   FORM_VISIBILITY_THRESHOLD,
   isPaymobPaymentResultMessage,
   NETWORK_TIMEOUT_MS,
   normalizePhoneNumber,
   ORDER_SUCCESS_CLOSE_DELAY_MS,
-  readOfflineOrders,
   SCROLL_STATE_CHECK_DELAY_MS,
-  writeOfflineOrders,
 } from '@/lib/customer/floating-cart-utils'
 
 interface FloatingCartController {
@@ -64,6 +61,14 @@ interface FloatingCartController {
   handleCheckout: () => Promise<void>
   checkScrollState: () => void
   normalizePhoneNumber: (value: string) => string
+}
+
+// Fallback for environments lacking secure context crypto support
+const generateIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `idemp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
 }
 
 export function useFloatingCartController(): FloatingCartController {
@@ -180,48 +185,12 @@ export function useFloatingCartController(): FloatingCartController {
     isOrdered,
     resetCheckoutState,
     resetCustomerState
- ]);
+  ]);
 
   const openCart = useCallback(() => {
     trigger('medium')
     setIsOpen(true)
   }, [trigger])
-
-  const enqueueOfflineOrder = useCallback((orderData: OrderPayload) => {
-    const existingOrders = readOfflineOrders()
-    writeOfflineOrders([...existingOrders, orderData])
-  }, [])
-
-  const processOfflineQueue = useCallback(async () => {
-    if (typeof window === 'undefined' || !navigator.onLine) return
-
-    const queuedOrders = readOfflineOrders()
-    if (queuedOrders.length === 0) return
-
-    const remainingOrders: OrderPayload[] = []
-
-    for (const order of queuedOrders) {
-      try {
-        const response = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(order),
-        })
-
-        if (!response.ok && response.status >= 500) {
-          remainingOrders.push(order)
-        }
-      } catch {
-        remainingOrders.push(order)
-      }
-    }
-
-    if (remainingOrders.length === 0) {
-      clearOfflineOrders()
-    } else {
-      writeOfflineOrders(remainingOrders)
-    }
-  }, [])
 
   const completeLocalSuccessFlow = useCallback(() => {
     clearSuccessTimeout()
@@ -283,21 +252,25 @@ export function useFloatingCartController(): FloatingCartController {
   const handleCodCheckout = useCallback(
     async (orderData: OrderPayload) => {
       if (!navigator.onLine) {
-        enqueueOfflineOrder(orderData)
-        completeLocalSuccessFlow()
-        return
+        setErrorMsg('أنت غير متصل بالإنترنت. يرجى التحقق من اتصالك والمحاولة مرة أخرى.');
+        setIsSubmitting(false);
+        trigger('error');
+        return;
       }
 
       const controller = new AbortController()
       const timeoutId = window.setTimeout(
         () => controller.abort(),
-        NETWORK_TIMEOUT_MS,
+        NETWORK_TIMEOUT_MS || 15000,
       )
 
       try {
         const response = await fetch('/api/checkout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Idempotency-Key': generateIdempotencyKey()
+          },
           body: JSON.stringify(orderData),
           signal: controller.signal,
         })
@@ -309,25 +282,17 @@ export function useFloatingCartController(): FloatingCartController {
           throw new Error(data?.error || 'فشل تسجيل الطلب')
         }
 
+        // Transaction fully verified by backend. Proceed to clear state.
         completeLocalSuccessFlow()
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'حدث خطأ غير متوقع'
+        const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع'
 
         if (error instanceof Error && error.name === 'AbortError') {
-          enqueueOfflineOrder(orderData)
-          completeLocalSuccessFlow()
-          return
-        }
-
-        if (message === 'PRICE_MISMATCH') {
-          setErrorMsg(
-            'عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.',
-          )
+          setErrorMsg('انتهت مهلة الاتصال بسبب ضعف شبكة الإنترنت. طلبك لا يزال في السلة، يرجى المحاولة مرة أخرى.');
+        } else if (message === 'PRICE_MISMATCH') {
+          setErrorMsg('عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.');
         } else {
-          setErrorMsg(
-            'عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.',
-          )
+          setErrorMsg('عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.');
         }
 
         setIsSubmitting(false)
@@ -336,32 +301,66 @@ export function useFloatingCartController(): FloatingCartController {
         window.clearTimeout(timeoutId)
       }
     },
-    [completeLocalSuccessFlow, enqueueOfflineOrder, trigger],
+    [completeLocalSuccessFlow, trigger],
   )
 
   const handleCardCheckout = useCallback(async (orderData: OrderPayload) => {
-    const response = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderData),
-    })
-
-    const data = (await response
-      .json()
-      .catch(() => null)) as CheckoutApiResponse | null
-
-    if (!response.ok) {
-      if (response.status === 409) throw new Error('PRICE_MISMATCH')
-      throw new Error(data?.error || data?.message || 'Payment initialization failed')
+    if (!navigator.onLine) {
+      setErrorMsg('أنت غير متصل بالإنترنت. يرجى التحقق من اتصالك والمحاولة مرة أخرى.');
+      setIsSubmitting(false);
+      trigger('error');
+      return;
     }
 
-    if (!data?.url) {
-      throw new Error('Payment URL was not returned from the server')
-    }
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      NETWORK_TIMEOUT_MS || 15000,
+    )
 
-    setPaymentUrl(data.url)
-    setIsSubmitting(false)
-  }, [])
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Idempotency-Key': generateIdempotencyKey()
+        },
+        body: JSON.stringify(orderData),
+        signal: controller.signal,
+      })
+
+      const data = (await response
+        .json()
+        .catch(() => null)) as CheckoutApiResponse | null
+
+      if (!response.ok) {
+        if (response.status === 409) throw new Error('PRICE_MISMATCH')
+        throw new Error(data?.error || data?.message || 'Payment initialization failed')
+      }
+
+      if (!data?.url) {
+        throw new Error('Payment URL was not returned from the server')
+      }
+
+      setPaymentUrl(data.url)
+      setIsSubmitting(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع'
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        setErrorMsg('انتهت مهلة الاتصال بسبب ضعف شبكة الإنترنت. طلبك لا يزال في السلة، يرجى المحاولة مرة أخرى.');
+      } else if (message === 'PRICE_MISMATCH') {
+        setErrorMsg('عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.');
+      } else {
+        setErrorMsg('عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.');
+      }
+
+      setIsSubmitting(false)
+      trigger('error')
+    } finally {
+      window.clearTimeout(timeoutId)
+    }
+  }, [trigger])
 
   const handleCheckout = useCallback(async () => {
     if (items.length === 0 || isSubmitting) return
@@ -409,19 +408,7 @@ export function useFloatingCartController(): FloatingCartController {
 
       await handleCodCheckout(orderData)
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'حدث خطأ غير متوقع أثناء تنفيذ العملية'
-
-      if (message === 'PRICE_MISMATCH') {
-        setErrorMsg(
-          'عذراً، بعض المنتجات في سلتك لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.',
-        )
-      } else {
-        setErrorMsg(message)
-      }
-
+      // Top level boundary catch (most errors handled in domain-specific functions)
       setIsSubmitting(false)
       trigger('error')
     }
@@ -433,6 +420,7 @@ export function useFloatingCartController(): FloatingCartController {
     isSubmitting,
     items.length,
     trigger,
+    customerInfo.phone
   ])
 
   const retryAfterPaymentFailure = useCallback(() => {
@@ -476,32 +464,6 @@ export function useFloatingCartController(): FloatingCartController {
       observer.disconnect()
     }
   }, [isOpen, items.length])
-
-  useEffect(() => {
-    void processOfflineQueue()
-
-    const scheduleOfflineSync = () => {
-      window.requestAnimationFrame(() => {
-        void processOfflineQueue()
-      })
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        scheduleOfflineSync()
-      }
-    }
-
-    window.addEventListener('online', scheduleOfflineSync)
-    window.addEventListener('focus', scheduleOfflineSync)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      window.removeEventListener('online', scheduleOfflineSync)
-      window.removeEventListener('focus', scheduleOfflineSync)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [processOfflineQueue])
 
   useEffect(() => {
     setIsMounted(true)

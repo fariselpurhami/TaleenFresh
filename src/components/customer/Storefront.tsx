@@ -9,6 +9,7 @@ import { ProductCard } from '@/components/customer/ProductCard'
 import { useCart, selectTotalItems } from '@/hooks/useCart'
 import { FloatingCart } from '@/components/customer/FloatingCart'
 import { supabase } from '@/lib/supabase/client'
+import Image from 'next/image'
 
 export interface Product {
   readonly id: string
@@ -112,9 +113,13 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
       <header className="flex items-center justify-between px-6 pb-1 pt-0">
         <div className="flex items-center gap-3">
           <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white p-0.5 shadow-md">
-            <img
+            <Image
               src="/icon-512x512.png"
               alt="TaleenFresh Logo"
+	      width={48}
+              height={48}
+              priority
+              unoptimized
               className="h-full w-full object-contain"
             />
           </div>
