@@ -161,7 +161,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
 
       <div className="mb-8">
         <div className="mb-4 flex items-center justify-center px-6">
-          <h3 className="text-lg font-black text-foreground">الأقسام</h3>
+          <h2 className="text-lg font-black text-foreground">الأقسام</h2>
         </div>
         <div className="flex justify-center gap-4 pb-2 pt-1">
           {CATEGORIES.map((category) => (

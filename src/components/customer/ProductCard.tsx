@@ -132,7 +132,7 @@ export const ProductCard = memo(function ProductCard({
             </span>
             <div className="ml-1.5 flex shrink-0 items-baseline gap-0.5">
               <span className="text-[12px] font-bold text-[#2C643E]">ج.م</span>
-              <span className="text-[11px] font-bold text-gray-400">/{unit}</span>
+              <span className="text-[11px] font-bold text-gray-700">/{unit}</span>
             </div>
           </div>
         </div>
