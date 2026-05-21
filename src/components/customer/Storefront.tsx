@@ -120,7 +120,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
               sizes="48px"
               priority
               decoding="async"
-              className="object-cover scale-[1.35]"
+              className="object-cover scale-[1.10]"
             />
           </div>
           <div>
