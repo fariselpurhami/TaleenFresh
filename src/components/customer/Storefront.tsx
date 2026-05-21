@@ -32,10 +32,10 @@ interface StorefrontProps {
 }
 
 const CATEGORIES: readonly CategoryConfig[] = [
-  { id: 'all', name: 'الكل', icon: '🥗', color: 'bg-orange-100' },
-  { id: 'veggies', name: 'خضروات', icon: '🫜', color: 'bg-emerald-100' },
-  { id: 'fruits', name: 'فواكه', icon: '🍒', color: 'bg-red-100' },
-  { id: 'leaf_greens', name: 'ورقيات', icon: '☘️', color: 'bg-green-100' },
+  { id: 'all', name: 'الكل', icon: '🥗', color: 'bg-white' },
+  { id: 'veggies', name: 'خضروات', icon: '🫛', color: 'bg-white' },
+  { id: 'fruits', name: 'فواكه', icon: '🍏', color: 'bg-white' },
+  { id: 'leaf_greens', name: 'ورقيات', icon: '🍀', color: 'bg-white' },
 ]
 
 const getGreeting = (hour: number): string => {
@@ -112,7 +112,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
     <div dir="rtl" className="relative min-h-[100dvh] bg-transparent pb-24">
       <header className="flex items-center justify-between px-6 pb-1 pt-0">
         <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-[#2C643E] bg-white shadow-md">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white shadow-md">
             <Image
               src="/TaleenFresh.png"
               alt="TaleenFresh Logo"
@@ -120,7 +120,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
               sizes="48px"
               priority
               decoding="async"
-              className="object-cover scale-[1.05]"
+              className="object-cover scale-[1]"
             />
           </div>
           <div>
@@ -174,10 +174,10 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
             >
               <motion.div
                 whileTap={{ scale: 0.9 }}
-                className={`flex h-16 w-16 items-center justify-center rounded-full border-2 shadow-sm transition-colors ${
+                className={`flex h-16 w-16 items-center justify-center rounded-full shadow-sm transition-colors ${
                   selectedCategory === category.id
-                    ? 'border-[#2C643E] bg-white'
-                    : `border-white ${category.color}`
+                    ? 'border-2 border-[#2C643E] bg-white'
+                    : `border border-gray-440 ${category.color}`
                 }`}
               >
                 <span className="text-2xl" aria-hidden="true">
@@ -237,7 +237,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-40 mx-auto w-full max-w-[340px] px-2">
-        <div className="pointer-events-auto flex h-20 items-center justify-between rounded-full border bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+        <div className="pointer-events-auto flex h-20 items-center justify-between rounded-full bg-white px-5 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
           <button type="button" className="flex flex-col items-center gap-1 text-[#2C643E]">
             <Home size={24} strokeWidth={2.5} aria-hidden="true" />
             <span className="text-[10px] font-bold">الرئيسية</span>
