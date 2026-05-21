@@ -2,7 +2,7 @@
 
 'use client'
 
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ShoppingCart } from 'lucide-react'
@@ -59,25 +59,36 @@ export const ProductCard = memo(function ProductCard({
   }, [])
 
   const handleAdd = useCallback(() => {
-    if (!isAvailable) return
+  if (!isAvailable) return;
 
-    const product: CartProductInput = {
-      id,
-      name,
-      price,
-      category,
-    }
+  const product: CartProductInput = {
+    id,
+    name,
+    price,
+    category,
+  };
 
-    window.dispatchEvent(new CustomEvent('cart-bounce'))
-    addItem(product as never)
-    setIsAdded(true)
-    clearResetTimer()
+  setIsAdded(true);
+  clearResetTimer();
 
-    resetAddedStateTimeoutRef.current = window.setTimeout(() => {
-      setIsAdded(false)
-      resetAddedStateTimeoutRef.current = null
-    }, ADD_FEEDBACK_DURATION_MS)
-  }, [addItem, category, clearResetTimer, id, isAvailable, name, price])
+  startTransition(() => {
+    addItem(product);
+  });
+
+  requestAnimationFrame(() => {
+    window.dispatchEvent(
+      new CustomEvent('cart:bounce', { 
+        bubbles: true, 
+        composed: true 
+      })
+    );
+  });
+
+  resetAddedStateTimeoutRef.current = window.setTimeout(() => {
+    setIsAdded(false);
+    resetAddedStateTimeoutRef.current = null;
+  }, ADD_FEEDBACK_DURATION_MS);
+}, [isAvailable, id, name, price, category, clearResetTimer, addItem]);
 
   useEffect(() => {
     return () => {

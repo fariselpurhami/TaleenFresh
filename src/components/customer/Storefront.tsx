@@ -68,7 +68,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
     setLiveProducts(initialProducts)
 
     const handleCustomEvent = () => handleCartBounce()
-    window.addEventListener('cart-bounce', handleCustomEvent)
+    window.addEventListener('cart:bounce', handleCustomEvent)
 
     const channel = supabase
       .channel('realtime-storefront')
@@ -86,7 +86,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
       .subscribe()
 
     return () => {
-      window.removeEventListener('cart-bounce', handleCustomEvent)
+      window.removeEventListener('cart:bounce', handleCustomEvent)
       void supabase.removeChannel(channel)
     }
   }, [initialProducts, handleCartBounce])
@@ -114,7 +114,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
         <div className="flex items-center gap-3">
           <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white p-0.5 shadow-md">
             <Image
-              src="/icon-512x512.png"
+              src="/TaleenFresh.png"
               alt="TaleenFresh Logo"
 	      width={48}
               height={48}
