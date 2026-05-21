@@ -112,15 +112,15 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
     <div dir="rtl" className="relative min-h-[100dvh] bg-transparent pb-24">
       <header className="flex items-center justify-between px-6 pb-1 pt-0">
         <div className="flex items-center gap-3">
-          <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white p-0.5 shadow-md">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-md">
             <Image
               src="/TaleenFresh.png"
               alt="TaleenFresh Logo"
-	      width={48}
-              height={48}
+	      fill
+              sizes="48px"
               priority
-              unoptimized
-              className="h-full w-full object-contain"
+              decoding="async"
+              className="object-cover scale-[1.35]"
             />
           </div>
           <div>
