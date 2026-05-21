@@ -118,9 +118,9 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
               alt="TaleenFresh Logo"
 	      fill
               sizes="48px"
-              priority
               decoding="async"
-              className="object-cover scale-[1]"
+	      unoptimized
+              className="object-cover"
             />
           </div>
           <div>
