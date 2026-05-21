@@ -2,7 +2,7 @@
 
 'use client'
 
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, ShoppingCart } from 'lucide-react'
@@ -71,18 +71,16 @@ export const ProductCard = memo(function ProductCard({
   setIsAdded(true);
   clearResetTimer();
 
-  startTransition(() => {
-    addItem(product);
-  });
-
-  requestAnimationFrame(() => {
+  setTimeout(() => {
+    addItem(product as never);
     window.dispatchEvent(
-      new CustomEvent('cart:bounce', { 
-        bubbles: true, 
-        composed: true 
+      new CustomEvent('cart:bounce', {
+        detail: { productId: id },
+        bubbles: true,
+        composed: true
       })
     );
-  });
+  }, 0);
 
   resetAddedStateTimeoutRef.current = window.setTimeout(() => {
     setIsAdded(false);
