@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, ShoppingBag, X } from 'lucide-react'
+import { ArrowRight, ShoppingBag, X, ShieldCheck } from 'lucide-react'
 import { useFloatingCartController } from '@/hooks/customer/useFloatingCartController'
 import { DELIVERY_FEE } from '@/lib/customer/floating-cart-utils'
 import { CartItemRow } from '@/components/customer/floating-cart/CartItemRow'
@@ -166,6 +166,14 @@ export function FloatingCart() {
                         </div>
                       ) : (
                         <>
+			  <div className="mb-4 flex items-start gap-3 rounded-2xl border border-green-600/20 bg-green-50/60 p-3.5 text-right" dir="rtl">
+                            <ShieldCheck className="h-5 w-5 shrink-0 text-[#2C643E] mt-0.5" />
+                            <div className="space-y-0.5">
+                              <p className="text-[11px] font-bold leading-relaxed text-gray-700">
+                                استلم أوردرك، راجعه براحتك، ولو أي منتج معجبكش متستلموش وماتدفعش تمنه.
+                              </p>
+                            </div>
+                          </div>
                           <div className="space-y-3">
                             {items.map((item) => (
                               <CartItemRow
