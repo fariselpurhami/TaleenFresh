@@ -112,7 +112,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
     <div dir="rtl" className="relative min-h-[100dvh] bg-transparent pb-24">
       <header className="flex items-center justify-between px-6 pb-1 pt-0">
         <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-md">
+          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-[#2C643E] bg-white shadow-md">
             <Image
               src="/TaleenFresh.png"
               alt="TaleenFresh Logo"
