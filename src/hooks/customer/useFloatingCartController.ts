@@ -492,24 +492,35 @@ export function useFloatingCartController(): FloatingCartController {
   ])
 
   useEffect(() => {
-    clearScrollStateTimeout()
+  if (!isOpen || paymentUrl) {
+    setShowScrollArrow(false);
+    return;
+  }
 
-    if (isOpen && !paymentUrl) {
-      scrollStateTimeoutRef.current = window.setTimeout(
-        checkScrollState,
-        SCROLL_STATE_CHECK_DELAY_MS,
-      )
-      return clearScrollStateTimeout
-    }
+  const container = scrollContainerRef.current;
+  if (!container) return;
 
-    setShowScrollArrow(false)
-  }, [
-    checkScrollState,
-    clearScrollStateTimeout,
-    isOpen,
-    items,
-    paymentUrl,
-  ])
+  let animationFrameId: number;
+
+  const handleResize = () => {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(checkScrollState);
+  };
+
+  const timeoutId = window.setTimeout(handleResize, 350);
+  const resizeObserver = new ResizeObserver(handleResize);
+
+  resizeObserver.observe(container);
+  if (container.firstElementChild) {
+    resizeObserver.observe(container.firstElementChild);
+  }
+
+  return () => {
+    window.clearTimeout(timeoutId);
+    cancelAnimationFrame(animationFrameId);
+    resizeObserver.disconnect();
+  };
+}, [isOpen, paymentUrl, checkScrollState]);
 
   useEffect(() => {
     const textarea = addressRef.current
