@@ -40,7 +40,7 @@ export default async function CustomerHomePage() {
         <header className="mb-6">
           <h1 className="sr-only">TaleenFresh</h1>
 
-          <div className="relative mb-2 h-7 w-full max-w-[150px] md:h-16 md:max-w-[250px]">
+          <div className="relative mb-2 h-8 w-full max-w-[170px] md:h-18 md:max-w-[280px]">
             <Image
               src="/TaleenFresh.png"
               alt="TaleenFresh"
