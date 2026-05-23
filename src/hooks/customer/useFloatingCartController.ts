@@ -6,9 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCheckout } from '@/store/useCheckout'
 import { useCart, selectCartTotal } from '@/hooks/useCart'
 import { useHaptics } from '@/hooks/useHaptics'
+import { supabase } from '@/lib/supabase/client'
 import type {
   CartDisplayItem,
   CheckoutApiResponse,
+  FloatingCartController,
   OrderPayload,
   PaymentMethod,
 } from '@/types/customer/floating-cart'
@@ -19,57 +21,83 @@ import {
   NETWORK_TIMEOUT_MS,
   normalizePhoneNumber,
   ORDER_SUCCESS_CLOSE_DELAY_MS,
-  SCROLL_STATE_CHECK_DELAY_MS,
 } from '@/lib/customer/floating-cart-utils'
 
-interface FloatingCartController {
-  isOpen: boolean
-  isMounted: boolean
-  isSubmitting: boolean
-  isOrdered: boolean
-  errorMsg: string
-  paymentUrl: string | null
-  paymentMethod: PaymentMethod | null
-  showScrollArrow: boolean
-  isPaymentFailed: boolean
-  isFormVisible: boolean
-  customerInfo: {
-    name: string;
-    phone: string;
-    address: string;
-  }
-  items: CartDisplayItem[]
-  hasHydrated: boolean
-  cartTotal: number
-  finalTotal: number
-  isMissingInputs: boolean
-  isMissingPayment: boolean
-  isFormIncomplete: boolean
-  firstCustomerName: string
-  showScrollHint: boolean
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>
-  addressRef: React.RefObject<HTMLTextAreaElement | null>
-  formContainerRef: React.RefObject<HTMLDivElement | null>
-  setCustomerInfo: (info: Partial<{ name: string; phone: string; address: string }>) => void;
-  setPaymentMethod: (method: PaymentMethod | null) => void
-  openCart: () => void
-  closeCart: () => void
-  resetPaymentFlow: () => void
-  retryAfterPaymentFailure: () => void
-  updateQty: (id: string, qty: number) => void; 
-  removeItem: (id: string) => void; 
-  handleCheckout: () => Promise<void>
-  checkScrollState: () => void
-  normalizePhoneNumber: (value: string) => string
-}
+const SESSION_STORAGE_KEY = 'tf_session_id'
+const TRACKING_DEBOUNCE_MS = 1500
+const SCROLL_BOTTOM_THRESHOLD_PX = 20
+const RESIZE_SETTLE_DELAY_MS = 350
+const EGYPT_MOBILE_PHONE_REGEX = /^01[0125]\d{8}$/
+const ARABIC_DEFAULT_CUSTOMER_NAME = 'عميلنا'
 
-// Fallback for environments lacking secure context crypto support
 const generateIdempotencyKey = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
   return `idemp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
 }
+
+const isBrowser = (): boolean => typeof window !== 'undefined'
+
+const safeGetLocalStorage = (): Storage | null => {
+  if (!isBrowser()) {
+    return null
+  }
+
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+const getOrCreateSessionId = (): string => {
+  const storage = safeGetLocalStorage()
+  if (!storage) {
+    return generateIdempotencyKey()
+  }
+
+  const existing = storage.getItem(SESSION_STORAGE_KEY)
+  if (existing) {
+    return existing
+  }
+
+  const next = generateIdempotencyKey()
+  storage.setItem(SESSION_STORAGE_KEY, next)
+  return next
+}
+
+const clearTrackedSessionId = (): void => {
+  const storage = safeGetLocalStorage()
+  storage?.removeItem(SESSION_STORAGE_KEY)
+}
+
+const toCanonicalEgyptMobile = (value: string): string => {
+  const normalized = value.trim()
+  if (normalized.startsWith('+20')) {
+    return `0${normalized.slice(3).replace(/\D/g, '')}`
+  }
+  if (normalized.startsWith('0020')) {
+    return `0${normalized.slice(4).replace(/\D/g, '')}`
+  }
+  return normalized.replace(/\D/g, '')
+}
+
+const isValidEgyptMobilePhone = (value: string): boolean =>
+  EGYPT_MOBILE_PHONE_REGEX.test(toCanonicalEgyptMobile(value))
+
+const buildTrackingStatus = (itemsCount: number, isOrdered: boolean): 'active' | 'abandoned' | 'converted' => {
+  if (isOrdered) {
+    return 'converted'
+  }
+  return itemsCount > 0 ? 'active' : 'abandoned'
+}
+
+const sanitizeTrackedCustomerInfo = (customerInfo: { name: string; phone: string; address: string }) => ({
+  name: customerInfo.name.trim(),
+  phone: normalizePhoneNumber(customerInfo.phone.trim()),
+  address: customerInfo.address.trim(),
+})
 
 export function useFloatingCartController(): FloatingCartController {
   const [isOpen, setIsOpen] = useState(false)
@@ -96,12 +124,11 @@ export function useFloatingCartController(): FloatingCartController {
   const addressRef = useRef<HTMLTextAreaElement>(null)
   const formContainerRef = useRef<HTMLDivElement>(null)
   const successTimeoutRef = useRef<number | null>(null)
-  const scrollStateTimeoutRef = useRef<number | null>(null)
+  const trackingTimeoutRef = useRef<number | null>(null)
+  const resizeSettleTimeoutRef = useRef<number | null>(null)
+  const resizeAnimationFrameRef = useRef<number | null>(null)
 
-  const finalTotal = useMemo(
-    () => (cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0),
-    [cartTotal],
-  )
+  const finalTotal = useMemo(() => (cartTotal > 0 ? cartTotal + DELIVERY_FEE : 0), [cartTotal])
 
   const isMissingInputs = useMemo(
     () =>
@@ -116,35 +143,48 @@ export function useFloatingCartController(): FloatingCartController {
 
   const firstCustomerName = useMemo(() => {
     const firstPart = customerInfo.name.trim().split(/\s+/)[0]
-    return firstPart || 'عميلنا'
+    return firstPart || ARABIC_DEFAULT_CUSTOMER_NAME
   }, [customerInfo.name])
 
   const showScrollHint = useMemo(
     () =>
       showScrollArrow &&
       isFormIncomplete &&
-      ((isMissingInputs && !isFormVisible) ||
-        (!isMissingInputs && isMissingPayment)),
-    [
-      isFormIncomplete,
-      isFormVisible,
-      isMissingInputs,
-      isMissingPayment,
-      showScrollArrow,
-    ],
+      ((isMissingInputs && !isFormVisible) || (!isMissingInputs && isMissingPayment)),
+    [isFormIncomplete, isFormVisible, isMissingInputs, isMissingPayment, showScrollArrow],
   )
 
   const clearSuccessTimeout = useCallback(() => {
+    if (!isBrowser()) {
+      return
+    }
     if (successTimeoutRef.current !== null) {
       window.clearTimeout(successTimeoutRef.current)
       successTimeoutRef.current = null
     }
   }, [])
 
-  const clearScrollStateTimeout = useCallback(() => {
-    if (scrollStateTimeoutRef.current !== null) {
-      window.clearTimeout(scrollStateTimeoutRef.current)
-      scrollStateTimeoutRef.current = null
+  const clearTrackingTimeout = useCallback(() => {
+    if (!isBrowser()) {
+      return
+    }
+    if (trackingTimeoutRef.current !== null) {
+      window.clearTimeout(trackingTimeoutRef.current)
+      trackingTimeoutRef.current = null
+    }
+  }, [])
+
+  const clearResizeObserversWork = useCallback(() => {
+    if (!isBrowser()) {
+      return
+    }
+    if (resizeSettleTimeoutRef.current !== null) {
+      window.clearTimeout(resizeSettleTimeoutRef.current)
+      resizeSettleTimeoutRef.current = null
+    }
+    if (resizeAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(resizeAnimationFrameRef.current)
+      resizeAnimationFrameRef.current = null
     }
   }, [])
 
@@ -167,25 +207,59 @@ export function useFloatingCartController(): FloatingCartController {
     setErrorMsg('')
   }, [])
 
-  const closeCart = useCallback(() => {
-    clearSuccessTimeout();
-    clearScrollStateTimeout();
-
-    if (isOrdered) {
-      clearCart();
-      resetCheckoutState();
-      resetCustomerState();
+  const checkScrollState = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) {
+      return
     }
 
-    setIsOpen(false);
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const hasScrollableContent = scrollHeight > clientHeight
+    const isNearBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < SCROLL_BOTTOM_THRESHOLD_PX
+
+    setShowScrollArrow(hasScrollableContent && !isNearBottom)
+  }, [])
+
+  const syncCartSession = useCallback(
+    async (statusOverride?: 'active' | 'abandoned' | 'converted') => {
+      const sessionId = getOrCreateSessionId()
+      const status = statusOverride ?? buildTrackingStatus(items.length, isOrdered)
+
+      await supabase.from('cart_sessions').upsert(
+        {
+          session_id: sessionId,
+          cart_items: items,
+          cart_total: cartTotal,
+          customer_info: sanitizeTrackedCustomerInfo(customerInfo),
+          status,
+        },
+        { onConflict: 'session_id' },
+      )
+    },
+    [cartTotal, customerInfo, isOrdered, items],
+  )
+
+  const closeCart = useCallback(() => {
+    clearSuccessTimeout()
+    clearTrackingTimeout()
+    clearResizeObserversWork()
+
+    if (isOrdered) {
+      clearCart()
+      resetCheckoutState()
+      resetCustomerState()
+    }
+
+    setIsOpen(false)
   }, [
     clearCart,
-    clearScrollStateTimeout,
+    clearResizeObserversWork,
     clearSuccessTimeout,
+    clearTrackingTimeout,
     isOrdered,
     resetCheckoutState,
-    resetCustomerState
-  ]);
+    resetCustomerState,
+  ])
 
   const openCart = useCallback(() => {
     trigger('medium')
@@ -201,35 +275,27 @@ export function useFloatingCartController(): FloatingCartController {
     setErrorMsg('')
     setIsPaymentFailed(false)
 
+    void syncCartSession('converted').catch(() => undefined)
+
+    if (!isBrowser()) {
+      return
+    }
+
     successTimeoutRef.current = window.setTimeout(() => {
       clearCart()
       setIsOpen(false)
       resetCheckoutState()
       resetCustomerState()
+      clearTrackedSessionId()
     }, ORDER_SUCCESS_CLOSE_DELAY_MS)
-  }, [
-    clearCart,
-    clearSuccessTimeout,
-    resetCheckoutState,
-    resetCustomerState,
-    trigger,
-  ])
-
-  const checkScrollState = useCallback(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const { scrollTop, scrollHeight, clientHeight } = container
-    const hasScrollableContent = scrollHeight > clientHeight
-    const isNearBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 20
-
-    setShowScrollArrow(hasScrollableContent && !isNearBottom)
-  }, [])
+  }, [clearCart, clearSuccessTimeout, resetCheckoutState, resetCustomerState, syncCartSession, trigger])
 
   const buildOrderPayload = useCallback((): OrderPayload => {
+    const sanitizedPhone = normalizePhoneNumber(customerInfo.phone.trim())
+
     return {
       customer_name: customerInfo.name.trim(),
-      customer_phone: customerInfo.phone.trim(),
+      customer_phone: sanitizedPhone,
       customer_address: customerInfo.address.trim(),
       items: items.map((item) => ({
         name: item.name,
@@ -240,130 +306,101 @@ export function useFloatingCartController(): FloatingCartController {
       status: 'pending',
       payment_method: paymentMethod as PaymentMethod,
     }
-  }, [
-    customerInfo.address,
-    customerInfo.name,
-    customerInfo.phone,
-    finalTotal,
-    items,
-    paymentMethod,
-  ])
+  }, [customerInfo.address, customerInfo.name, customerInfo.phone, finalTotal, items, paymentMethod])
 
-  const handleCodCheckout = useCallback(
-    async (orderData: OrderPayload) => {
-      if (!navigator.onLine) {
-        setErrorMsg('أنت غير متصل بالإنترنت. يرجى التحقق من اتصالك والمحاولة مرة أخرى.');
-        setIsSubmitting(false);
-        trigger('error');
-        return;
-      }
-
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(
-        () => controller.abort(),
-        NETWORK_TIMEOUT_MS || 15000,
-      )
-
-      try {
-        const response = await fetch('/api/checkout', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Idempotency-Key': generateIdempotencyKey()
-          },
-          body: JSON.stringify(orderData),
-          signal: controller.signal,
-        })
-
-        const data = await response.json().catch(() => null)
-
-        if (!response.ok) {
-          if (response.status === 409) throw new Error('PRICE_MISMATCH')
-          throw new Error(data?.error || 'فشل تسجيل الطلب')
-        }
-
-        // Transaction fully verified by backend. Proceed to clear state.
-        completeLocalSuccessFlow()
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع'
-
-        if (error instanceof Error && error.name === 'AbortError') {
-          setErrorMsg('انتهت مهلة الاتصال بسبب ضعف شبكة الإنترنت. طلبك لا يزال في السلة، يرجى المحاولة مرة أخرى.');
-        } else if (message === 'PRICE_MISMATCH') {
-          setErrorMsg('عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.');
-        } else {
-          setErrorMsg('عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.');
-        }
-
-        setIsSubmitting(false)
-        trigger('error')
-      } finally {
-        window.clearTimeout(timeoutId)
-      }
-    },
-    [completeLocalSuccessFlow, trigger],
-  )
-
-  const handleCardCheckout = useCallback(async (orderData: OrderPayload) => {
+  const postCheckout = useCallback(async (orderData: OrderPayload): Promise<CheckoutApiResponse | null> => {
     if (!navigator.onLine) {
-      setErrorMsg('أنت غير متصل بالإنترنت. يرجى التحقق من اتصالك والمحاولة مرة أخرى.');
-      setIsSubmitting(false);
-      trigger('error');
-      return;
+      throw new Error('OFFLINE')
     }
 
     const controller = new AbortController()
-    const timeoutId = window.setTimeout(
-      () => controller.abort(),
-      NETWORK_TIMEOUT_MS || 15000,
-    )
+    const timeoutId = window.setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS || 15000)
 
     try {
       const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': generateIdempotencyKey()
+          'Idempotency-Key': generateIdempotencyKey(),
         },
         body: JSON.stringify(orderData),
         signal: controller.signal,
       })
 
-      const data = (await response
-        .json()
-        .catch(() => null)) as CheckoutApiResponse | null
+      const data = (await response.json().catch(() => null)) as CheckoutApiResponse | null
 
       if (!response.ok) {
-        if (response.status === 409) throw new Error('PRICE_MISMATCH')
-        throw new Error(data?.error || data?.message || 'Payment initialization failed')
+        if (response.status === 409) {
+          throw new Error('PRICE_MISMATCH')
+        }
+        throw new Error(data?.error || data?.message || 'CHECKOUT_REQUEST_FAILED')
       }
 
-      if (!data?.url) {
-        throw new Error('Payment URL was not returned from the server')
-      }
-
-      setPaymentUrl(data.url)
-      setIsSubmitting(false)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'حدث خطأ غير متوقع'
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        setErrorMsg('انتهت مهلة الاتصال بسبب ضعف شبكة الإنترنت. طلبك لا يزال في السلة، يرجى المحاولة مرة أخرى.');
-      } else if (message === 'PRICE_MISMATCH') {
-        setErrorMsg('عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.');
-      } else {
-        setErrorMsg('عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.');
-      }
-
-      setIsSubmitting(false)
-      trigger('error')
+      return data
     } finally {
       window.clearTimeout(timeoutId)
     }
-  }, [trigger])
+  }, [])
+
+  const resolveCheckoutError = useCallback((error: unknown): string => {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return 'انتهت مهلة الاتصال بسبب ضعف شبكة الإنترنت. طلبك لا يزال في السلة، يرجى المحاولة مرة أخرى.'
+    }
+
+    if (error instanceof Error) {
+      if (error.message === 'OFFLINE') {
+        return 'أنت غير متصل بالإنترنت. يرجى التحقق من اتصالك والمحاولة مرة أخرى.'
+      }
+      if (error.message === 'PRICE_MISMATCH') {
+        return 'عذراً، بعض المنتجات لم تعد متوفرة أو تغير سعرها، يرجى تحديث السلة.'
+      }
+    }
+
+    return 'عذراً، حدث خطأ في تسجيل الطلب. يرجى التأكد من البيانات أو المحاولة لاحقاً.'
+  }, [])
+
+  const handleCodCheckout = useCallback(
+    async (orderData: OrderPayload) => {
+      try {
+        await postCheckout(orderData)
+        completeLocalSuccessFlow()
+      } catch (error) {
+        setErrorMsg(resolveCheckoutError(error))
+        setIsSubmitting(false)
+        trigger('error')
+      }
+    },
+    [completeLocalSuccessFlow, postCheckout, resolveCheckoutError, trigger],
+  )
+
+  const handleCardCheckout = useCallback(
+    async (orderData: OrderPayload) => {
+      try {
+        const data = await postCheckout(orderData)
+
+        if (!data?.url) {
+          throw new Error('MISSING_PAYMENT_URL')
+        }
+
+        setPaymentUrl(data.url)
+        setIsSubmitting(false)
+      } catch (error) {
+        setErrorMsg(
+          error instanceof Error && error.message === 'MISSING_PAYMENT_URL'
+            ? 'تعذر تهيئة رابط الدفع. يرجى المحاولة مرة أخرى.'
+            : resolveCheckoutError(error),
+        )
+        setIsSubmitting(false)
+        trigger('error')
+      }
+    },
+    [postCheckout, resolveCheckoutError, trigger],
+  )
 
   const handleCheckout = useCallback(async () => {
-    if (items.length === 0 || isSubmitting) return
+    if (items.length === 0 || isSubmitting) {
+      return
+    }
 
     if (isFormIncomplete) {
       trigger('medium')
@@ -374,24 +411,15 @@ export function useFloatingCartController(): FloatingCartController {
       return
     }
 
-    const normalizedPhone = customerInfo.phone.trim();
-    const canonicalPhone = normalizedPhone.startsWith('+20')
-      ? `0${normalizedPhone.slice(3).replace(/\D/g, '')}`
-      : normalizedPhone.startsWith('0020')
-        ? `0${normalizedPhone.slice(4).replace(/\D/g, '')}`
-        : normalizedPhone.replace(/\D/g, '');
-
-    const isValidEgyptMobilePhone = /^01[0125]\d{8}$/.test(canonicalPhone);
-
-    if (!isValidEgyptMobilePhone) {
-      setErrorMsg('برجاء إدخال رقم هاتف مصري صحيح مكون من ١١ رقم (مثال: 01012345678)');
-      trigger('error');
+    if (!isValidEgyptMobilePhone(customerInfo.phone)) {
+      setErrorMsg('برجاء إدخال رقم هاتف مصري صحيح مكون من ١١ رقم (مثال: 01012345678)')
+      trigger('error')
       formContainerRef.current?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
-        inline: 'nearest'
-      });
-      return;
+        inline: 'nearest',
+      })
+      return
     }
 
     const orderData = buildOrderPayload()
@@ -400,27 +428,21 @@ export function useFloatingCartController(): FloatingCartController {
     setErrorMsg('')
     trigger('medium')
 
-    try {
-      if (orderData.payment_method === 'card') {
-        await handleCardCheckout(orderData)
-        return
-      }
-
-      await handleCodCheckout(orderData)
-    } catch (error) {
-      // Top level boundary catch (most errors handled in domain-specific functions)
-      setIsSubmitting(false)
-      trigger('error')
+    if (orderData.payment_method === 'card') {
+      await handleCardCheckout(orderData)
+      return
     }
+
+    await handleCodCheckout(orderData)
   }, [
     buildOrderPayload,
+    customerInfo.phone,
     handleCardCheckout,
     handleCodCheckout,
     isFormIncomplete,
     isSubmitting,
     items.length,
     trigger,
-    customerInfo.phone
   ])
 
   const retryAfterPaymentFailure = useCallback(() => {
@@ -431,10 +453,31 @@ export function useFloatingCartController(): FloatingCartController {
   useEffect(() => {
     return () => {
       clearSuccessTimeout()
-      clearScrollStateTimeout()
+      clearTrackingTimeout()
+      clearResizeObserversWork()
       document.body.style.overflow = ''
     }
-  }, [clearScrollStateTimeout, clearSuccessTimeout])
+  }, [clearResizeObserversWork, clearSuccessTimeout, clearTrackingTimeout])
+
+  useEffect(() => {
+    if (!hasHydrated || !isMounted) {
+      return
+    }
+
+    clearTrackingTimeout()
+
+    if (items.length === 0 && isOrdered) {
+      return
+    }
+
+    trackingTimeoutRef.current = window.setTimeout(() => {
+      void syncCartSession().catch(() => undefined)
+    }, TRACKING_DEBOUNCE_MS)
+
+    return () => {
+      clearTrackingTimeout()
+    }
+  }, [cartTotal, clearTrackingTimeout, customerInfo, hasHydrated, isMounted, isOrdered, items, syncCartSession])
 
   useEffect(() => {
     if (!isOpen || items.length === 0) {
@@ -445,11 +488,13 @@ export function useFloatingCartController(): FloatingCartController {
     const targetNode = formContainerRef.current
     const rootNode = scrollContainerRef.current
 
-    if (!targetNode) return
+    if (!targetNode) {
+      return
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const [entry] = entries
+        const entry = entries[0]
         setIsFormVisible(Boolean(entry?.isIntersecting))
       },
       {
@@ -461,6 +506,7 @@ export function useFloatingCartController(): FloatingCartController {
     observer.observe(targetNode)
 
     return () => {
+      observer.unobserve(targetNode)
       observer.disconnect()
     }
   }, [isOpen, items.length])
@@ -482,49 +528,52 @@ export function useFloatingCartController(): FloatingCartController {
 
     document.body.style.overflow = ''
     clearSuccessTimeout()
-    clearScrollStateTimeout()
+    clearResizeObserversWork()
     resetCheckoutState()
-  }, [
-    clearScrollStateTimeout,
-    clearSuccessTimeout,
-    isOpen,
-    resetCheckoutState,
-  ])
+  }, [clearResizeObserversWork, clearSuccessTimeout, isOpen, resetCheckoutState])
 
   useEffect(() => {
-  if (!isOpen || paymentUrl) {
-    setShowScrollArrow(false);
-    return;
-  }
+    if (!isOpen || paymentUrl) {
+      setShowScrollArrow(false)
+      return
+    }
 
-  const container = scrollContainerRef.current;
-  if (!container) return;
+    const container = scrollContainerRef.current
+    if (!container) {
+      return
+    }
 
-  let animationFrameId: number;
+    const scheduleScrollStateCheck = () => {
+      clearResizeObserversWork()
+      resizeAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        checkScrollState()
+      })
+    }
 
-  const handleResize = () => {
-    cancelAnimationFrame(animationFrameId);
-    animationFrameId = requestAnimationFrame(checkScrollState);
-  };
+    resizeSettleTimeoutRef.current = window.setTimeout(scheduleScrollStateCheck, RESIZE_SETTLE_DELAY_MS)
 
-  const timeoutId = window.setTimeout(handleResize, 350);
-  const resizeObserver = new ResizeObserver(handleResize);
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleScrollStateCheck()
+    })
 
-  resizeObserver.observe(container);
-  if (container.firstElementChild) {
-    resizeObserver.observe(container.firstElementChild);
-  }
+    resizeObserver.observe(container)
 
-  return () => {
-    window.clearTimeout(timeoutId);
-    cancelAnimationFrame(animationFrameId);
-    resizeObserver.disconnect();
-  };
-}, [isOpen, paymentUrl, checkScrollState]);
+    const firstChild = container.firstElementChild
+    if (firstChild) {
+      resizeObserver.observe(firstChild)
+    }
+
+    return () => {
+      resizeObserver.disconnect()
+      clearResizeObserversWork()
+    }
+  }, [checkScrollState, clearResizeObserversWork, isOpen, paymentUrl])
 
   useEffect(() => {
     const textarea = addressRef.current
-    if (!textarea) return
+    if (!textarea) {
+      return
+    }
 
     textarea.style.height = 'auto'
     textarea.style.height = `${textarea.scrollHeight}px`
@@ -532,8 +581,13 @@ export function useFloatingCartController(): FloatingCartController {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
-      if (!isPaymobPaymentResultMessage(event.data)) return
+      if (event.origin !== window.location.origin) {
+        return
+      }
+
+      if (!isPaymobPaymentResultMessage(event.data)) {
+        return
+      }
 
       if (event.data.success) {
         completeLocalSuccessFlow()
@@ -543,9 +597,7 @@ export function useFloatingCartController(): FloatingCartController {
       setPaymentUrl(null)
       setIsSubmitting(false)
       setIsPaymentFailed(true)
-      setErrorMsg(
-        'عذراً، فشلت عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار الدفع عند الاستلام.',
-      )
+      setErrorMsg('عذراً، فشلت عملية الدفع. يرجى المحاولة مرة أخرى أو اختيار الدفع عند الاستلام.')
       trigger('error')
     }
 
