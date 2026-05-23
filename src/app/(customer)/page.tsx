@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import Image from 'next/image';
 import Storefront from '@/components/customer/Storefront';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function CustomerHomePage() {
   const cookieStore = await cookies();
