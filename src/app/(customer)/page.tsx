@@ -6,7 +6,6 @@ import Image from 'next/image';
 import Storefront from '@/components/customer/Storefront';
 
 export const revalidate = 60;
-
 export default async function CustomerHomePage() {
   const cookieStore = await cookies();
 
@@ -23,9 +22,7 @@ export default async function CustomerHomePage() {
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options);
             });
-          } catch {
-            //
-          }
+          } catch {}
         },
       },
     }
@@ -42,20 +39,68 @@ export default async function CustomerHomePage() {
         <header className="mb-6">
           <h1 className="sr-only">TaleenFresh</h1>
 
-          <div className="relative mb-2 h-8 w-full max-w-[170px] md:h-18 md:max-w-[280px]">
-            <Image
-              src="/TaleenFresh.webp"
-              alt="TaleenFresh"
-              fill
-              priority
-	      unoptimized
-              sizes="(max-width: 768px) 200px, 350px"
-              className="object-contain object-left"
-            />
+          <div className="mb-2 flex items-center justify-between gap-4">
+            <div className="relative h-8 w-[170px] shrink-0 md:h-[72px] md:w-[280px]">
+              <Image
+                src="/TaleenFresh.webp"
+                alt="TaleenFresh"
+                fill
+                priority
+                unoptimized
+                sizes="(max-width: 768px) 170px, 280px"
+                className="object-contain object-left"
+              />
+            </div>
+
+            <nav aria-label="Social media" className="ml-auto flex items-center justify-end gap-1">
+              <a
+                href="https://facebook.com/taleenfresh"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#2C643E] transition-transform duration-200 hover:scale-110 active:scale-95"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.099 4.388 23.094 10.125 24v-8.438H7.078v-3.489h3.047V9.413c0-3.017 1.792-4.686 4.533-4.686 1.313 0 2.686.235 2.686.235v2.962H15.83c-1.491 0-1.956.928-1.956 1.88v2.257h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.099 24 12.073Z" />
+                </svg>
+              </a>
+
+              <a
+                href="https://instagram.com/taleenfresh"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#2C643E] transition-transform duration-200 hover:scale-110 active:scale-95"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                </svg>
+              </a>
+            </nav>
           </div>
 
           <p className="text-sm font-light tracking-wide text-slate-500 md:text-lg">
-            Nature's best produce, straight to your door.
+            Nature&apos;s best produce, straight to your door.
           </p>
         </header>
 
