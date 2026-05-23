@@ -48,6 +48,7 @@ export default async function CustomerHomePage() {
               alt="TaleenFresh"
               fill
               priority
+	      unoptimized
               sizes="(max-width: 768px) 200px, 350px"
               className="object-contain object-left"
             />
