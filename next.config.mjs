@@ -15,6 +15,7 @@ const nextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ['192.168.1.3', 'localhost:3000'],
   images: {
+    unoptimized: true,
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
