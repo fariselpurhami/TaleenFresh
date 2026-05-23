@@ -120,7 +120,18 @@ export function FloatingCart() {
               </button>
             </div>
 
-            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
+	      <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-0 mix-blend-multiply will-change-transform"
+                style={{
+                  backgroundImage: "url('/pattern.webp')",
+                  backgroundRepeat: 'repeat',
+                  backgroundSize: '320px', 
+                  backgroundPosition: 'center 0',
+                  opacity: 0.18, 
+                  }}
+              />
               <AnimatePresence mode="wait">
                 {paymentUrl ? (
                   <PaymentIframeView paymentUrl={paymentUrl} />
