@@ -54,7 +54,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 mix-blend-multiply will-change-transform"
         style={{
-          backgroundImage: "url('/pattern.jpg')",
+          backgroundImage: "url('/pattern.webp')",
           backgroundRepeat: 'repeat',
           backgroundSize: '400px',
           backgroundPosition: 'center 0',

@@ -114,7 +114,7 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
         <div className="flex items-center gap-3">
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white shadow-md">
             <Image
-              src="/brand-logo.png"
+              src="/brand-logo.webp"
               alt="TaleenFresh Logo"
 	      fill
               sizes="48px"

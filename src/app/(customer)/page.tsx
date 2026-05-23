@@ -44,7 +44,7 @@ export default async function CustomerHomePage() {
 
           <div className="relative mb-2 h-8 w-full max-w-[170px] md:h-18 md:max-w-[280px]">
             <Image
-              src="/TaleenFresh.png"
+              src="/TaleenFresh.webp"
               alt="TaleenFresh"
               fill
               priority
