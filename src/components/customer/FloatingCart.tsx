@@ -13,6 +13,7 @@ import { CheckoutForm } from '@/components/customer/floating-cart/CheckoutForm'
 import { PaymentFailureView } from '@/components/customer/floating-cart/PaymentFailureView'
 import { PaymentIframeView } from '@/components/customer/floating-cart/PaymentIframeView'
 import { SuccessView } from '@/components/customer/floating-cart/SuccessView'
+import type { CartDisplayItem } from '@/types/customer/floating-cart'
 
 export function FloatingCart() {
   const {
@@ -186,7 +187,7 @@ export function FloatingCart() {
                             </div>
                           </div>
                           <div className="space-y-3">
-                            {items.map((item) => (
+                            {items.map((item: CartDisplayItem) => (
                               <CartItemRow
                                 key={item.id}
                                 item={item}
