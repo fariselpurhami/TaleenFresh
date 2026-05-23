@@ -1,3 +1,5 @@
+// src/app/(customer)/page.tsx
+
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Image from 'next/image';
@@ -46,7 +48,6 @@ export default async function CustomerHomePage() {
               alt="TaleenFresh"
               fill
               priority
-              unoptimized
               sizes="(max-width: 768px) 200px, 350px"
               className="object-contain object-left"
             />

@@ -119,7 +119,6 @@ export default function Storefront({ initialProducts }: StorefrontProps) {
 	      fill
               sizes="48px"
               decoding="async"
-	      unoptimized
               className="object-cover"
             />
           </div>

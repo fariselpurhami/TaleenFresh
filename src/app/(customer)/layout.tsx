@@ -11,14 +11,14 @@ const notoKufi = Noto_Kufi_Arabic({
   weight: ['400', '500', '600', '700'],
   variable: '--font-noto-kufi',
   display: 'swap',
-  preload: false,
+  preload: true,
 });
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
-  preload: false,
+  preload: true,
 });
 
 export const viewport: Viewport = {
