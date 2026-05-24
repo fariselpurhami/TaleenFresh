@@ -16,6 +16,7 @@ import { useHaptics } from '@/hooks/useHaptics';
 import {
   useAdminOrders,
   type AdminOrder,
+  type OrderItem,
   type OrderStatus,
 } from '@/providers/AdminOrdersProvider';
 import {
@@ -27,12 +28,6 @@ import {
 } from '@/components/ui/select';
 
 type TabType = 'pending' | 'processing' | 'archived';
-
-export interface OrderItem {
-  name: string;
-  qty: number;
-  price: number;
-}
 
 type StatusPresentation = {
   bg: string;
@@ -349,7 +344,7 @@ export default function OrdersClient() {
                     className="rounded-xl border border-gray-100 bg-gray-50 p-4"
                   >
                     <div className="space-y-3">
-                      {order.items.map((item, index) => (
+                      {order.items.map((item: OrderItem, index: number) => (
                         <div
                           key={`${order.id}-${item.name}-${index}`}
                           className="flex items-center justify-between gap-4 text-sm"

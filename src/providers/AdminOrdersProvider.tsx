@@ -1,3 +1,5 @@
+// src/providers/AdminOrdersProvider.tsx 
+
 'use client';
 
 import {
@@ -34,25 +36,27 @@ export interface AdminOrder {
 
 type AdminOrdersContextType = {
   orders: AdminOrder[];
+  newOrder: AdminOrder | null;
+  clearNewOrder: () => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
 };
-
-const AdminOrdersContext = createContext<AdminOrdersContextType | null>(null);
 
 type AdminOrdersProviderProps = {
   initialOrders: AdminOrder[];
   children: ReactNode;
 };
 
-const upsertOrder = (currentOrders: AdminOrder[], incomingOrder: AdminOrder): AdminOrder[] => {
-  const index = currentOrders.findIndex((order) => order.id === incomingOrder.id);
+const AdminOrdersContext = createContext<AdminOrdersContextType | null>(null);
 
-  if (index === -1) {
+const upsertOrder = (currentOrders: AdminOrder[], incomingOrder: AdminOrder): AdminOrder[] => {
+  const existingIndex = currentOrders.findIndex((order) => order.id === incomingOrder.id);
+
+  if (existingIndex === -1) {
     return [incomingOrder, ...currentOrders];
   }
 
   const nextOrders = [...currentOrders];
-  nextOrders[index] = incomingOrder;
+  nextOrders[existingIndex] = incomingOrder;
   return nextOrders;
 };
 
@@ -61,41 +65,52 @@ export function AdminOrdersProvider({
   children,
 }: AdminOrdersProviderProps) {
   const [orders, setOrders] = useState<AdminOrder[]>(initialOrders);
+  const [newOrder, setNewOrder] = useState<AdminOrder | null>(null);
+
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const ordersRef = useRef<AdminOrder[]>(initialOrders);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
 
   useEffect(() => {
     setOrders(initialOrders);
+    ordersRef.current = initialOrders;
   }, [initialOrders]);
+
+  const clearNewOrder = useCallback(() => {
+    setNewOrder(null);
+  }, []);
 
   const updateOrderStatus = useCallback(
     async (orderId: string, status: OrderStatus) => {
-      const previousOrders = orders;
+      const previousOrders = ordersRef.current;
 
-      setOrders((currentOrders) =>
-        currentOrders.map((order) =>
-          order.id === orderId ? { ...order, status } : order
-        )
+      const optimisticOrders = previousOrders.map((order) =>
+        order.id === orderId ? { ...order, status } : order
       );
 
-      const { error } = await supabase
-        .from('orders')
-        .update({ status })
-        .eq('id', orderId);
+      setOrders(optimisticOrders);
+      ordersRef.current = optimisticOrders;
+
+      const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
 
       if (error) {
         setOrders(previousOrders);
+        ordersRef.current = previousOrders;
         throw error;
       }
     },
-    [orders]
+    []
   );
 
   useEffect(() => {
     let isActive = true;
 
-    const existingChannel = channelRef.current;
-    if (existingChannel) {
-      void supabase.removeChannel(existingChannel);
+    const currentChannel = channelRef.current;
+    if (currentChannel) {
+      void supabase.removeChannel(currentChannel);
       channelRef.current = null;
     }
 
@@ -114,8 +129,9 @@ export function AdminOrdersProvider({
             return;
           }
 
-          const newOrder = payload.new as AdminOrder;
-          setOrders((currentOrders) => upsertOrder(currentOrders, newOrder));
+          const insertedOrder = payload.new as AdminOrder;
+          setOrders((currentOrders) => upsertOrder(currentOrders, insertedOrder));
+          setNewOrder(insertedOrder);
         }
       )
       .on(
@@ -147,14 +163,18 @@ export function AdminOrdersProvider({
           }
 
           const deletedOrderId = String(payload.old.id);
+
           setOrders((currentOrders) =>
             currentOrders.filter((order) => order.id !== deletedOrderId)
+          );
+
+          setNewOrder((currentNewOrder) =>
+            currentNewOrder?.id === deletedOrderId ? null : currentNewOrder
           );
         }
       );
 
     channel.subscribe();
-
     channelRef.current = channel;
 
     return () => {
@@ -170,16 +190,14 @@ export function AdminOrdersProvider({
   const value = useMemo<AdminOrdersContextType>(
     () => ({
       orders,
+      newOrder,
+      clearNewOrder,
       updateOrderStatus,
     }),
-    [orders, updateOrderStatus]
+    [orders, newOrder, clearNewOrder, updateOrderStatus]
   );
 
-  return (
-    <AdminOrdersContext.Provider value={value}>
-      {children}
-    </AdminOrdersContext.Provider>
-  );
+  return <AdminOrdersContext.Provider value={value}>{children}</AdminOrdersContext.Provider>;
 }
 
 export function useAdminOrders(): AdminOrdersContextType {
