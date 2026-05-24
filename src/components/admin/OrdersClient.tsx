@@ -15,7 +15,7 @@ import {
   User,
 } from 'lucide-react';
 import { useHaptics } from '@/hooks/useHaptics';
-import { useAdminOrders } from '@/providers/AdminOrdersProvider';
+import { useAdminOrders, type Order } from '@/providers/AdminOrdersProvider';
 import {
   Select,
   SelectContent,
@@ -27,21 +27,10 @@ import {
 export type OrderStatus = 'pending' | 'processing' | 'delivered' | 'cancelled';
 type TabType = 'pending' | 'processing' | 'archived';
 
-export interface OrderItem {
+interface OrderItem {
   name: string;
   qty: number;
   price: number;
-}
-
-export interface AdminOrder {
-  id: string;
-  status: OrderStatus;
-  created_at: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_address: string;
-  items: OrderItem[];
-  total_price: number;
 }
 
 type StatusPresentation = {
@@ -90,9 +79,9 @@ const STATUS_CONFIG: Record<OrderStatus, StatusPresentation> = {
   },
 };
 
-const DELIVERY_FEE = 25;
-const PHONE_ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 const STATUS_KEYS = Object.keys(STATUS_CONFIG) as OrderStatus[];
+const DELIVERY_FEE = 25;
+const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 
 const dateFormatter = new Intl.DateTimeFormat('ar-EG', {
   numberingSystem: 'latn',
@@ -103,15 +92,66 @@ const dateFormatter = new Intl.DateTimeFormat('ar-EG', {
   hour12: true,
 });
 
-const currencyFormatter = new Intl.NumberFormat('en-US');
+const moneyFormatter = new Intl.NumberFormat('en-US');
 
-const formatDate = (dateString: string): string =>
-  dateFormatter.format(new Date(dateString)).replace(',', ' |');
+const isOrderStatus = (value: unknown): value is OrderStatus =>
+  typeof value === 'string' && value in STATUS_CONFIG;
+
+const getString = (value: unknown, fallback = ''): string =>
+  typeof value === 'string' ? value : fallback;
+
+const getNumber = (value: unknown, fallback = 0): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const getItems = (value: unknown): OrderItem[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const name = getString(record.name).trim();
+    const qty = getNumber(record.qty);
+    const price = getNumber(record.price);
+
+    if (!name) {
+      return [];
+    }
+
+    return [{ name, qty, price }];
+  });
+};
 
 const normalizePhoneNumber = (value: string): string =>
-  value.replace(/[٠-٩]/g, (digit) => String(PHONE_ARABIC_DIGITS.indexOf(digit)));
+  value.replace(/[٠-٩]/g, (digit) => String(ARABIC_DIGITS.indexOf(digit)));
 
-const formatMoney = (value: number): string => `${currencyFormatter.format(value)} ج`;
+const formatDate = (value: string): string =>
+  dateFormatter.format(new Date(value)).replace(',', ' |');
+
+const formatMoney = (value: number): string => `${moneyFormatter.format(value)} ج`;
+
+const getOrderStatus = (order: Order): OrderStatus =>
+  isOrderStatus(order.status) ? order.status : 'pending';
+
+const getOrderCreatedAt = (order: Order): string => getString(order.created_at);
+
+const getOrderCustomerName = (order: Order): string =>
+  getString(order.customer_name, 'عميل غير معروف');
+
+const getOrderCustomerPhone = (order: Order): string =>
+  normalizePhoneNumber(getString(order.customer_phone));
+
+const getOrderCustomerAddress = (order: Order): string =>
+  getString(order.customer_address, 'لا يوجد عنوان');
+
+const getOrderItems = (order: Order): OrderItem[] => getItems(order.items);
+
+const getOrderTotalPrice = (order: Order): number =>
+  getNumber(order.total_price, DELIVERY_FEE);
 
 const getEmptyStateCopy = (tab: TabType): { title: string; description: string } => {
   if (tab === 'pending') {
@@ -134,41 +174,39 @@ const getEmptyStateCopy = (tab: TabType): { title: string; description: string }
   };
 };
 
-const getFilteredOrders = (orders: AdminOrder[], activeTab: TabType): AdminOrder[] => {
+const filterOrdersByTab = (orders: Order[], activeTab: TabType): Order[] => {
   if (activeTab === 'pending') {
-    return orders.filter((order) => order.status === 'pending');
+    return orders.filter((order) => getOrderStatus(order) === 'pending');
   }
 
   if (activeTab === 'processing') {
-    return orders.filter((order) => order.status === 'processing');
+    return orders.filter((order) => getOrderStatus(order) === 'processing');
   }
 
-  return orders.filter(
-    (order) => order.status === 'delivered' || order.status === 'cancelled'
-  );
+  return orders.filter((order) => {
+    const status = getOrderStatus(order);
+    return status === 'delivered' || status === 'cancelled';
+  });
 };
 
 export default function OrdersClient() {
-  const { orders, updateOrderStatus } = useAdminOrders() as {
-    orders: AdminOrder[];
-    updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
-  };
+  const { orders, updateOrderStatus } = useAdminOrders();
   const { trigger } = useHaptics();
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   const pendingCount = useMemo(
-    () => orders.filter((order) => order.status === 'pending').length,
+    () => orders.filter((order) => getOrderStatus(order) === 'pending').length,
     [orders]
   );
 
   const processingCount = useMemo(
-    () => orders.filter((order) => order.status === 'processing').length,
+    () => orders.filter((order) => getOrderStatus(order) === 'processing').length,
     [orders]
   );
 
   const filteredOrders = useMemo(
-    () => getFilteredOrders(orders, activeTab),
+    () => filterOrdersByTab(orders, activeTab),
     [orders, activeTab]
   );
 
@@ -288,7 +326,14 @@ export default function OrdersClient() {
           </div>
         ) : (
           filteredOrders.map((order) => {
-            const status = STATUS_CONFIG[order.status];
+            const statusKey = getOrderStatus(order);
+            const status = STATUS_CONFIG[statusKey];
+            const createdAt = getOrderCreatedAt(order);
+            const customerName = getOrderCustomerName(order);
+            const customerPhone = getOrderCustomerPhone(order);
+            const customerAddress = getOrderCustomerAddress(order);
+            const items = getOrderItems(order);
+            const totalPrice = getOrderTotalPrice(order);
             const isUpdating = updatingOrderId === order.id;
 
             return (
@@ -304,7 +349,7 @@ export default function OrdersClient() {
                 <header className="flex items-center justify-between border-b border-gray-50 bg-gray-50/30 p-4 pl-5 pr-6">
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
                     <Clock className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                    <time dateTime={order.created_at}>{formatDate(order.created_at)}</time>
+                    <time dateTime={createdAt}>{formatDate(createdAt)}</time>
                   </div>
                   <div
                     className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs font-bold text-gray-400"
@@ -322,7 +367,7 @@ export default function OrdersClient() {
                       </div>
                       <div>
                         <p className="mb-0.5 text-xs font-medium text-gray-400">العميل</p>
-                        <p className="text-sm font-bold text-gray-900">{order.customer_name}</p>
+                        <p className="text-sm font-bold text-gray-900">{customerName}</p>
                       </div>
                     </div>
 
@@ -333,11 +378,12 @@ export default function OrdersClient() {
                       <div>
                         <p className="mb-0.5 text-xs font-medium text-gray-400">رقم الهاتف</p>
                         <a
-                          href={`tel:${normalizePhoneNumber(order.customer_phone)}`}
+                          href={customerPhone ? `tel:${customerPhone}` : undefined}
                           className="rounded font-mono text-sm font-bold tracking-wide text-gray-900 hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                           dir="ltr"
+                          aria-disabled={!customerPhone}
                         >
-                          {normalizePhoneNumber(order.customer_phone)}
+                          {customerPhone || 'غير متوفر'}
                         </a>
                       </div>
                     </div>
@@ -351,7 +397,7 @@ export default function OrdersClient() {
                           العنوان بالتفصيل
                         </p>
                         <p className="text-sm font-bold leading-relaxed text-gray-900">
-                          {order.customer_address}
+                          {customerAddress}
                         </p>
                       </div>
                     </div>
@@ -362,7 +408,7 @@ export default function OrdersClient() {
                     className="rounded-xl border border-gray-100 bg-gray-50 p-4"
                   >
                     <div className="space-y-3">
-                      {order.items.map((item, index) => (
+                      {items.map((item, index) => (
                         <div
                           key={`${order.id}-${item.name}-${index}`}
                           className="flex items-center justify-between gap-4 text-sm"
@@ -396,8 +442,12 @@ export default function OrdersClient() {
 
                 <footer className="mt-auto flex items-center justify-between gap-4 border-t border-gray-100 bg-gray-50/80 p-4">
                   <Select
-                    value={order.status}
-                    onValueChange={(value) => void handleStatusChange(order.id, value as OrderStatus)}
+                    value={statusKey}
+                    onValueChange={(value) => {
+                      if (isOrderStatus(value)) {
+                        void handleStatusChange(order.id, value);
+                      }
+                    }}
                     disabled={isUpdating}
                   >
                     <SelectTrigger
@@ -428,7 +478,7 @@ export default function OrdersClient() {
                       الإجمالي شامل
                     </p>
                     <p className="font-mono text-xl font-black text-green-700">
-                      {currencyFormatter.format(order.total_price)} ج.م
+                      {moneyFormatter.format(totalPrice)} ج.م
                     </p>
                   </div>
                 </footer>

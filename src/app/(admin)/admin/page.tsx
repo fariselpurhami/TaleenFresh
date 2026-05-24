@@ -6,15 +6,12 @@ import { Package, ShoppingCart, BarChart3 } from 'lucide-react';
 
 import { supabase } from '@/lib/supabase/client';
 import OrdersClient from '@/components/admin/OrdersClient';
+import type { Order } from '@/providers/AdminOrdersProvider';
 import { AdminProductCard } from '@/components/admin/AdminProductCard';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { fetchAdminDashboardData } from '@/app/actions/admin-actions';
 
 type TabType = 'orders' | 'inventory' | 'analytics';
-
-export type Order = NonNullable<ComponentProps<typeof OrdersClient>['initialOrders']>[number] & {
-  id: string;
-};
 
 export type Product = NonNullable<ComponentProps<typeof AdminProductCard>['product']> & {
   id: string;
@@ -173,7 +170,7 @@ export default function AdminDashboardPage() {
               transition={{ duration: 0.2 }}
               className="w-full"
             >
-              <OrdersClient initialOrders={orders} />
+              <OrdersClient />
             </motion.section>
           )}
 
