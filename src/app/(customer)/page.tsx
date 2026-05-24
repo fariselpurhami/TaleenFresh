@@ -40,7 +40,7 @@ export default async function CustomerHomePage() {
           <h1 className="sr-only">TaleenFresh</h1>
 
           <div className="mb-2 flex items-center justify-between gap-4">
-            <div className="relative h-8 w-[170px] shrink-0 md:h-[72px] md:w-[280px]">
+            <div className="relative h-10 w-[200px] shrink-0 md:h-[80px] md:w-[300px]">
               <Image
                 src="/TaleenFresh.webp"
                 alt="TaleenFresh"
