@@ -1,19 +1,21 @@
-// next.config.mjs
+// next.config.mjs 
 
-import { withSentryConfig } from '@sentry/nextjs';
-import withSerwistInit from '@serwist/next';
+import { withSentryConfig } from '@sentry/nextjs'
+import withSerwistInit from '@serwist/next'
+
+const isDevelopment = process.env.NODE_ENV === 'development'
 
 const withSerwist = withSerwistInit({
   swSrc: 'src/app/sw.ts',
   swDest: 'public/sw.js',
-  disable: process.env.NODE_ENV === 'development',
+  disable: isDevelopment,
   register: true,
   reloadOnOnline: false,
-});
+})
 
 const nextConfig = {
   reactStrictMode: true,
-  allowedDevOrigins: ['192.168.1.3', 'localhost:3000'],
+  allowedDevOrigins: ['localhost', '192.168.1.3'],
   images: {
     unoptimized: true,
     formats: ['image/avif', 'image/webp'],
@@ -25,17 +27,13 @@ const nextConfig = {
       },
     ],
   },
-};
+}
 
-export default withSentryConfig(withSerwist(nextConfig), {
+const sentryOptions = {
   org: 'taleenfresh',
   project: 'javascript-nextjs',
   silent: !process.env.CI,
   widenClientFileUpload: true,
-  webpack: {
-    automaticVercelMonitors: true,
-    treeshake: {
-      removeDebugLogging: true,
-    },
-  },
-});
+}
+
+export default withSentryConfig(withSerwist(nextConfig), sentryOptions)
