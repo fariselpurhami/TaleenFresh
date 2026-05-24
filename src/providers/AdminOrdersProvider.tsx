@@ -1,5 +1,3 @@
-// src/providers/AdminOrdersProvider.tsx
-
 'use client';
 
 import {
@@ -16,16 +14,30 @@ import { useRouter } from 'next/navigation';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 
-export interface Order {
+export type OrderStatus = 'pending' | 'processing' | 'delivered' | 'cancelled';
+
+export interface OrderItem {
+  name: string;
+  qty: number;
+  price: number;
+}
+
+export interface AdminOrder {
   id: string;
-  status: string;
+  status: OrderStatus;
+  created_at: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  items: OrderItem[];
+  total_price: number;
   [key: string]: unknown;
 }
 
 export interface AdminOrdersContextType {
-  orders: Order[];
-  newOrder: Order | null;
-  updateOrderStatus: (id: string, status: string) => Promise<void>;
+  orders: AdminOrder[];
+  newOrder: AdminOrder | null;
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   clearNewOrder: () => void;
 }
 
@@ -33,21 +45,21 @@ const AdminOrdersContext = createContext<AdminOrdersContextType | undefined>(und
 
 interface AdminOrdersProviderProps {
   readonly children: ReactNode;
-  readonly initialOrders: Order[];
+  readonly initialOrders: AdminOrder[];
 }
 
 export function AdminOrdersProvider({
   children,
   initialOrders,
 }: AdminOrdersProviderProps) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [newOrder, setNewOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<AdminOrder[]>(initialOrders);
+  const [newOrder, setNewOrder] = useState<AdminOrder | null>(null);
 
   const router = useRouter();
   const refreshFrameRef = useRef<number | null>(null);
   const lastRefreshAtRef = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  
+
   useEffect(() => {
     setOrders(initialOrders);
   }, [initialOrders]);
@@ -91,6 +103,7 @@ export function AdminOrdersProvider({
 
       if (refreshFrameRef.current !== null) {
         cancelAnimationFrame(refreshFrameRef.current);
+        refreshFrameRef.current = null;
       }
     };
   }, [scheduleRefresh]);
@@ -98,53 +111,66 @@ export function AdminOrdersProvider({
   useEffect(() => {
     let active = true;
 
+    const handleInsert = (payload: { new: Record<string, unknown> }) => {
+      if (!active) {
+        return;
+      }
+
+      const insertedOrder = payload.new as AdminOrder;
+
+      setOrders((current) => {
+        const exists = current.some((order) => order.id === insertedOrder.id);
+        return exists ? current : [insertedOrder, ...current];
+      });
+
+      setNewOrder(insertedOrder);
+    };
+
+    const handleUpdate = (payload: { new: Record<string, unknown> }) => {
+      if (!active) {
+        return;
+      }
+
+      const updatedOrder = payload.new as AdminOrder;
+
+      setOrders((current) => {
+        const exists = current.some((order) => order.id === updatedOrder.id);
+
+        if (!exists) {
+          return [updatedOrder, ...current];
+        }
+
+        return current.map((order) =>
+          order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
+        );
+      });
+
+      setNewOrder((current) =>
+        current?.id === updatedOrder.id ? { ...current, ...updatedOrder } : current
+      );
+    };
+
+    const handleDelete = (payload: { old: Record<string, unknown> }) => {
+      if (!active) {
+        return;
+      }
+
+      const deletedId =
+        typeof payload.old.id === 'string' ? payload.old.id : String(payload.old.id ?? '');
+
+      if (!deletedId) {
+        return;
+      }
+
+      setOrders((current) => current.filter((order) => order.id !== deletedId));
+      setNewOrder((current) => (current?.id === deletedId ? null : current));
+    };
+
     const channel = supabase
       .channel('admin-global-orders')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          if (!active) {
-            return;
-          }
-
-          const insertedOrder = payload.new as Order;
-
-          setOrders((current) => {
-            const exists = current.some((order) => order.id === insertedOrder.id);
-            return exists ? current : [insertedOrder, ...current];
-          });
-
-          setNewOrder(insertedOrder);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          if (!active) {
-            return;
-          }
-
-          const updatedOrder = payload.new as Order;
-
-          setOrders((current) => {
-            const exists = current.some((order) => order.id === updatedOrder.id);
-
-            if (!exists) {
-              return [updatedOrder, ...current];
-            }
-
-            return current.map((order) =>
-              order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
-            );
-          });
-
-          setNewOrder((current) =>
-            current?.id === updatedOrder.id ? { ...current, ...updatedOrder } : current
-          );
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, handleInsert)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, handleUpdate)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, handleDelete)
       .subscribe();
 
     channelRef.current = channel;
@@ -160,8 +186,8 @@ export function AdminOrdersProvider({
   }, []);
 
   const updateOrderStatus = useCallback(
-    async (orderId: string, newStatus: string) => {
-      let previousOrder: Order | null = null;
+    async (orderId: string, newStatus: OrderStatus) => {
+      let previousOrder: AdminOrder | null = null;
 
       setOrders((current) =>
         current.map((order) => {
@@ -189,12 +215,10 @@ export function AdminOrdersProvider({
 
       if (previousOrder) {
         setOrders((current) =>
-          current.map((order) => (order.id === orderId ? previousOrder! : order))
+          current.map((order) => (order.id === orderId ? previousOrder as AdminOrder : order))
         );
 
-        setNewOrder((current) =>
-          current?.id === orderId ? previousOrder : current
-        );
+        setNewOrder((current) => (current?.id === orderId ? previousOrder : current));
       }
 
       throw error;
