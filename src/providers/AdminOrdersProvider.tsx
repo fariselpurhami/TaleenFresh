@@ -10,30 +10,59 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
-import { useRouter } from 'next/navigation';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import type {
+  RealtimeChannel,
+  RealtimePostgresInsertPayload,
+  RealtimePostgresUpdatePayload,
+} from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 
+export interface OrderItem {
+  readonly name: string;
+  readonly qty: number;
+  readonly price: number;
+}
+
+export type OrderStatus = 'pending' | 'processing' | 'delivered' | 'cancelled';
+
 export interface Order {
-  id: string;
-  status: string;
-  [key: string]: unknown;
+  readonly id: string;
+  readonly status: OrderStatus | (string & {});
+  readonly total_price: number;
+  readonly created_at: string;
+  readonly customer_name: string;
+  readonly customer_phone: string;
+  readonly customer_address: string;
+  readonly items: readonly OrderItem[];
+  readonly [key: string]: unknown;
 }
 
 export interface AdminOrdersContextType {
-  orders: Order[];
-  newOrder: Order | null;
-  updateOrderStatus: (id: string, status: string) => Promise<void>;
-  clearNewOrder: () => void;
+  readonly orders: Order[];
+  readonly setOrders: Dispatch<SetStateAction<Order[]>>;
+  readonly newOrder: Order | null;
+  readonly clearNewOrder: () => void;
 }
-
-const AdminOrdersContext = createContext<AdminOrdersContextType | undefined>(undefined);
 
 interface AdminOrdersProviderProps {
   readonly children: ReactNode;
   readonly initialOrders: Order[];
+}
+
+interface RealtimeTokenResponse {
+  readonly token?: string;
+}
+
+const AdminOrdersContext = createContext<AdminOrdersContextType | undefined>(undefined);
+
+const TOKEN_REFRESH_INTERVAL_MS = 4 * 60 * 1000;
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }
 
 export function AdminOrdersProvider({
@@ -43,164 +72,145 @@ export function AdminOrdersProvider({
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [newOrder, setNewOrder] = useState<Order | null>(null);
 
-  const router = useRouter();
-  const refreshFrameRef = useRef<number | null>(null);
-  const lastRefreshAtRef = useRef(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  
-  useEffect(() => {
-    setOrders(initialOrders);
-  }, [initialOrders]);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initialOrdersRef = useRef<Order[]>(initialOrders);
 
-  const scheduleRefresh = useCallback(() => {
-    const now = Date.now();
-
-    if (now - lastRefreshAtRef.current < 1500) {
-      return;
+  const clearRealtimeResources = useCallback(() => {
+    if (refreshIntervalRef.current !== null) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
     }
 
-    lastRefreshAtRef.current = now;
-
-    if (refreshFrameRef.current !== null) {
-      cancelAnimationFrame(refreshFrameRef.current);
+    if (channelRef.current !== null) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
-
-    refreshFrameRef.current = window.requestAnimationFrame(() => {
-      router.refresh();
-      refreshFrameRef.current = null;
-    });
-  }, [router]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        scheduleRefresh();
-      }
-    };
-
-    const handleWindowFocus = () => {
-      scheduleRefresh();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleWindowFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleWindowFocus);
-
-      if (refreshFrameRef.current !== null) {
-        cancelAnimationFrame(refreshFrameRef.current);
-      }
-    };
-  }, [scheduleRefresh]);
-
-  useEffect(() => {
-    let active = true;
-
-    const channel = supabase
-      .channel('admin-global-orders')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          if (!active) {
-            return;
-          }
-
-          const insertedOrder = payload.new as Order;
-
-          setOrders((current) => {
-            const exists = current.some((order) => order.id === insertedOrder.id);
-            return exists ? current : [insertedOrder, ...current];
-          });
-
-          setNewOrder(insertedOrder);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          if (!active) {
-            return;
-          }
-
-          const updatedOrder = payload.new as Order;
-
-          setOrders((current) => {
-            const exists = current.some((order) => order.id === updatedOrder.id);
-
-            if (!exists) {
-              return [updatedOrder, ...current];
-            }
-
-            return current.map((order) =>
-              order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
-            );
-          });
-
-          setNewOrder((current) =>
-            current?.id === updatedOrder.id ? { ...current, ...updatedOrder } : current
-          );
-        }
-      )
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      active = false;
-
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
   }, []);
 
-  const updateOrderStatus = useCallback(
-    async (orderId: string, newStatus: string) => {
-      let previousOrder: Order | null = null;
+  const fetchTokenAndSetAuth = useCallback(async (signal: AbortSignal): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/admin/realtime-token', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal,
+      });
 
-      setOrders((current) =>
-        current.map((order) => {
-          if (order.id !== orderId) {
-            return order;
-          }
+      if (!response.ok) {
+        return false;
+      }
 
-          previousOrder = order;
-          return { ...order, status: newStatus };
-        })
-      );
+      const data = (await response.json()) as RealtimeTokenResponse;
+      const token = typeof data.token === 'string' ? data.token : null;
 
-      setNewOrder((current) =>
-        current?.id === orderId ? { ...current, status: newStatus } : current
-      );
+      if (!token) {
+        return false;
+      }
 
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', orderId);
+      supabase.realtime.setAuth(token);
+      return true;
+    } catch (error) {
+      if (isAbortError(error)) {
+        return false;
+      }
 
-      if (!error) {
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (initialOrdersRef.current !== initialOrders) {
+      setOrders(initialOrders);
+      initialOrdersRef.current = initialOrders;
+    }
+  }, [initialOrders]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const bootstrapController = new AbortController();
+
+    const initializeRealtime = async (): Promise<void> => {
+      clearRealtimeResources();
+
+      const authenticated = await fetchTokenAndSetAuth(bootstrapController.signal);
+
+      if (!authenticated || !isMounted) {
         return;
       }
 
-      if (previousOrder) {
-        setOrders((current) =>
-          current.map((order) => (order.id === orderId ? previousOrder! : order))
-        );
+      const channel = supabase
+        .channel('admin-global-orders')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'orders' },
+          (payload: RealtimePostgresInsertPayload<Order>) => {
+            if (!isMounted) {
+              return;
+            }
 
-        setNewOrder((current) =>
-          current?.id === orderId ? previousOrder : current
-        );
-      }
+            const insertedOrder = payload.new as Order;
 
-      throw error;
-    },
-    []
-  );
+            setOrders((current) => {
+              if (current.some((order) => order.id === insertedOrder.id)) {
+                return current;
+              }
+
+              return [insertedOrder, ...current];
+            });
+
+            setNewOrder(insertedOrder);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'orders' },
+          (payload: RealtimePostgresUpdatePayload<Order>) => {
+            if (!isMounted) {
+              return;
+            }
+
+            const updatedOrder = payload.new as Order;
+
+            setOrders((current) => {
+              const index = current.findIndex((order) => order.id === updatedOrder.id);
+
+              if (index === -1) {
+                return [updatedOrder, ...current];
+              }
+
+              const next = [...current];
+              next[index] = { ...next[index], ...updatedOrder };
+              return next;
+            });
+
+            setNewOrder((current) =>
+              current?.id === updatedOrder.id ? { ...current, ...updatedOrder } : current
+            );
+          }
+        )
+        .subscribe();
+
+      channelRef.current = channel;
+
+      refreshIntervalRef.current = setInterval(() => {
+        const refreshController = new AbortController();
+        void fetchTokenAndSetAuth(refreshController.signal).finally(() => {
+          refreshController.abort();
+        });
+      }, TOKEN_REFRESH_INTERVAL_MS);
+    };
+
+    void initializeRealtime();
+
+    return () => {
+      isMounted = false;
+      bootstrapController.abort();
+      clearRealtimeResources();
+    };
+  }, [clearRealtimeResources, fetchTokenAndSetAuth]);
 
   const clearNewOrder = useCallback(() => {
     setNewOrder(null);
@@ -209,20 +219,24 @@ export function AdminOrdersProvider({
   const value = useMemo<AdminOrdersContextType>(
     () => ({
       orders,
+      setOrders,
       newOrder,
-      updateOrderStatus,
       clearNewOrder,
     }),
-    [orders, newOrder, updateOrderStatus, clearNewOrder]
+    [orders, newOrder, clearNewOrder]
   );
 
-  return <AdminOrdersContext.Provider value={value}>{children}</AdminOrdersContext.Provider>;
+  return (
+    <AdminOrdersContext.Provider value={value}>
+      {children}
+    </AdminOrdersContext.Provider>
+  );
 }
 
 export function useAdminOrders(): AdminOrdersContextType {
   const context = useContext(AdminOrdersContext);
 
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAdminOrders must be used within an AdminOrdersProvider');
   }
 

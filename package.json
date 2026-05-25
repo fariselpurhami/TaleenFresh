@@ -24,6 +24,7 @@
     "date-fns": "^4.3.0",
     "framer-motion": "^12.40.0",
     "idb-keyval": "^6.2.4",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "next-themes": "^0.4.6",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "25.9.1",
     "@types/react": "19.2.15",
     "@types/react-dom": "19.2.3",

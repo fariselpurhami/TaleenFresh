@@ -1,321 +1,411 @@
-// src/components/admin/AnalyticsDashboard.tsx
-
 'use client';
 
-import React, { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { motion } from 'framer-motion';
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, Package, Clock, DollarSign } from 'lucide-react';
-
-export interface OrderItem {
-  name: string;
-  qty: number;
-  price: number;
-}
-
-export interface Order {
-  id: string;
-  total_price: number;
-  created_at: string;
-  items: OrderItem[];
-  status: string;
-}
+import {
+  DollarSign,
+  Package,
+  ShoppingCart,
+  TrendingUp,
+  type LucideIcon,
+} from 'lucide-react';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import type { Order, OrderItem, OrderStatus } from '@/providers/AdminOrdersProvider';
 
 export interface AnalyticsDashboardProps {
-  orders: Order[];
+  readonly orders: readonly Order[];
 }
 
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    payload: Record<string, unknown>;
-  }>;
-  label?: string;
-}
-
-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
-  if (active && payload && payload.length > 0) {
-    const dataPayload = payload[0];
-    const isRevenue = dataPayload.name === 'revenue';
-    const value = dataPayload.value ?? 0;
-
-    return (
-      <div
-        className="rounded-2xl border border-white/20 bg-black/85 px-5 py-4 text-white shadow-xl backdrop-blur-xl"
-        dir="rtl"
-        role="tooltip"
-      >
-        <p className="mb-1 text-sm font-medium text-gray-400">{label}</p>
-        <p className="font-mono text-xl font-black text-[#4ADE80]">
-          {value.toLocaleString('en-US')} {isRevenue ? 'ج.م' : 'كجم'}
-        </p>
-      </div>
-    );
-  }
-  return null;
+type RevenueChartPoint = {
+  readonly dayKey: string;
+  readonly dayLabel: string;
+  readonly revenue: number;
 };
 
+type TopProduct = {
+  readonly name: string;
+  readonly qty: number;
+};
+
+type AnalyticsSummary = {
+  readonly totalRevenue: number;
+  readonly totalOrders: number;
+  readonly fulfilledOrders: number;
+  readonly totalItemsSold: number;
+  readonly averageOrderValue: number;
+  readonly revenueChart: readonly RevenueChartPoint[];
+  readonly topProducts: readonly TopProduct[];
+};
+
+type MetricCard = {
+  readonly id: string;
+  readonly title: string;
+  readonly value: string;
+  readonly icon: LucideIcon;
+  readonly iconClassName: string;
+  readonly iconSurfaceClassName: string;
+  readonly borderClassName: string;
+};
+
+type TooltipPayloadEntry = {
+  readonly value?: ValueType;
+  readonly name?: NameType;
+  readonly dataKey?: string | number;
+  readonly payload?: RevenueChartPoint;
+};
+
+type ChartTooltipContentProps = {
+  readonly active?: boolean;
+  readonly payload?: readonly TooltipPayloadEntry[];
+  readonly label?: string | number;
+};
+
+const CANCELLED_STATUS: OrderStatus = 'cancelled';
+const INCLUDED_ORDER_STATUSES: readonly OrderStatus[] = ['pending', 'processing', 'delivered'];
+const CHART_STROKE = '#2C643E';
+const CHART_FILL_ID = 'analytics-revenue-gradient';
+const EMPTY_PRODUCT_STATE = 'لا توجد بيانات مبيعات حتى الآن';
+
+const currencyFormatter = new Intl.NumberFormat('en-US');
+const weekdayFormatter = new Intl.DateTimeFormat('ar-EG', { weekday: 'short' });
+
+const getSafeOrderItems = (items: Order['items']): readonly OrderItem[] => {
+  return Array.isArray(items) ? items : [];
+};
+
+const isIncludedStatus = (status: Order['status']): status is OrderStatus => {
+  return INCLUDED_ORDER_STATUSES.includes(status as OrderStatus);
+};
+
+const formatCurrency = (value: number): string => `${currencyFormatter.format(value)} ج.م`;
+
+const formatQuantity = (value: number): string => `${currencyFormatter.format(value)} كجم`;
+
+function CustomTooltip({ active, payload, label }: ChartTooltipContentProps): ReactElement | null {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const point = payload[0];
+  const rawValue = point?.value;
+  const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? 0);
+  const metricLabel = point?.dataKey === 'revenue' ? 'الإيراد' : 'القيمة';
+  const safeLabel = typeof label === 'string' || typeof label === 'number' ? String(label) : '';
+
+  return (
+    <div
+      className="rounded-2xl border border-white/15 bg-black/85 px-4 py-3 text-white shadow-2xl backdrop-blur-xl"
+      dir="rtl"
+      role="status"
+      aria-live="polite"
+    >
+      <p className="text-xs font-bold text-gray-400">{safeLabel}</p>
+      <p className="mt-1 text-sm font-medium text-gray-300">{metricLabel}</p>
+      <p className="mt-1 font-mono text-lg font-black text-emerald-400">
+        {formatCurrency(value)}
+      </p>
+    </div>
+  );
+}
+
 export function AnalyticsDashboard({ orders }: AnalyticsDashboardProps) {
-  const analyticsData = useMemo(() => {
+  const analyticsData = useMemo<AnalyticsSummary>(() => {
+    const today = new Date();
+    const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dayKeys: string[] = [];
+    const revenueMap = new Map<string, number>();
+
+    for (let index = 6; index >= 0; index -= 1) {
+      const currentDate = new Date(normalizedToday);
+      currentDate.setDate(normalizedToday.getDate() - index);
+      const dayKey = currentDate.toISOString().slice(0, 10);
+      dayKeys.push(dayKey);
+      revenueMap.set(dayKey, 0);
+    }
+
     let totalRevenue = 0;
+    let fulfilledOrders = 0;
     let totalItemsSold = 0;
-    const revenueByDay: Record<string, number> = {};
-    const productSales: Record<string, number> = {};
 
-    const formatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
+    const productSales = new Map<string, number>();
 
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      return formatter.format(d);
-    }).reverse();
+    for (const order of orders) {
+      if (order.status === CANCELLED_STATUS || !isIncludedStatus(order.status)) {
+        continue;
+      }
 
-    last7Days.forEach((day) => {
-      revenueByDay[day] = 0;
-    });
+      totalRevenue += order.total_price;
+      fulfilledOrders += 1;
 
-    orders.forEach((order) => {
-      if (order.status !== 'cancelled') {
-        totalRevenue += order.total_price;
+      const orderDate = new Date(order.created_at);
+      if (!Number.isNaN(orderDate.getTime())) {
+        const orderDayKey = new Date(
+          orderDate.getFullYear(),
+          orderDate.getMonth(),
+          orderDate.getDate()
+        )
+          .toISOString()
+          .slice(0, 10);
 
-        const date = new Date(order.created_at);
-        const dayName = formatter.format(date);
-
-        if (revenueByDay[dayName] !== undefined) {
-          revenueByDay[dayName] += order.total_price;
-        }
-
-        if (Array.isArray(order.items)) {
-          order.items.forEach((item) => {
-            totalItemsSold += item.qty;
-            productSales[item.name] = (productSales[item.name] || 0) + item.qty;
-          });
+        if (revenueMap.has(orderDayKey)) {
+          revenueMap.set(orderDayKey, (revenueMap.get(orderDayKey) ?? 0) + order.total_price);
         }
       }
+
+      for (const item of getSafeOrderItems(order.items)) {
+        totalItemsSold += item.qty;
+        productSales.set(item.name, (productSales.get(item.name) ?? 0) + item.qty);
+      }
+    }
+
+    const revenueChart = dayKeys.map((dayKey) => {
+      const parsedDate = new Date(`${dayKey}T00:00:00`);
+      return {
+        dayKey,
+        dayLabel: weekdayFormatter.format(parsedDate),
+        revenue: revenueMap.get(dayKey) ?? 0,
+      };
     });
 
-    const revenueChart = last7Days.map((day) => ({
-      day,
-      revenue: revenueByDay[day],
-    }));
-
-    const topProducts = Object.entries(productSales)
+    const topProducts = Array.from(productSales.entries())
       .map(([name, qty]) => ({ name, qty }))
-      .sort((a, b) => b.qty - a.qty)
+      .sort((left, right) => right.qty - left.qty || left.name.localeCompare(right.name, 'ar'))
       .slice(0, 5);
-
-    const averageOrderValue =
-      orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
 
     return {
       totalRevenue,
+      totalOrders: orders.length,
+      fulfilledOrders,
       totalItemsSold,
+      averageOrderValue: fulfilledOrders > 0 ? Math.round(totalRevenue / fulfilledOrders) : 0,
       revenueChart,
       topProducts,
-      averageOrderValue,
     };
   }, [orders]);
 
-  const cards = [
-    {
-      id: 'revenue',
-      title: 'إجمالي الإيرادات',
-      value: `${analyticsData.totalRevenue.toLocaleString('en-US')} ج.م`,
-      icon: DollarSign,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50',
-      border: 'border-emerald-100',
-    },
-    {
-      id: 'orders',
-      title: 'إجمالي الطلبات',
-      value: orders.length.toLocaleString('en-US'),
-      icon: Package,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50',
-      border: 'border-blue-100',
-    },
-    {
-      id: 'items',
-      title: 'الكميات المباعة',
-      value: `${analyticsData.totalItemsSold.toLocaleString('en-US')} كجم`,
-      icon: TrendingUp,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50',
-      border: 'border-amber-100',
-    },
-    {
-      id: 'aov',
-      title: 'متوسط قيمة الطلب',
-      value: `${analyticsData.averageOrderValue.toLocaleString('en-US')} ج.م`,
-      icon: Clock,
-      color: 'text-purple-600',
-      bg: 'bg-purple-50',
-      border: 'border-purple-100',
-    },
-  ];
+  const maxTopProductQty = useMemo(() => {
+    return analyticsData.topProducts.reduce((max, product) => Math.max(max, product.qty), 0);
+  }, [analyticsData.topProducts]);
+
+  const metricCards = useMemo<readonly MetricCard[]>(
+    () => [
+      {
+        id: 'revenue',
+        title: 'إجمالي الإيرادات',
+        value: formatCurrency(analyticsData.totalRevenue),
+        icon: DollarSign,
+        iconClassName: 'text-emerald-700',
+        iconSurfaceClassName: 'bg-emerald-50',
+        borderClassName: 'border-emerald-100',
+      },
+      {
+        id: 'orders',
+        title: 'إجمالي الطلبات',
+        value: currencyFormatter.format(analyticsData.totalOrders),
+        icon: ShoppingCart,
+        iconClassName: 'text-blue-700',
+        iconSurfaceClassName: 'bg-blue-50',
+        borderClassName: 'border-blue-100',
+      },
+      {
+        id: 'items',
+        title: 'الكميات المباعة',
+        value: formatQuantity(analyticsData.totalItemsSold),
+        icon: TrendingUp,
+        iconClassName: 'text-amber-700',
+        iconSurfaceClassName: 'bg-amber-50',
+        borderClassName: 'border-amber-100',
+      },
+      {
+        id: 'aov',
+        title: 'متوسط قيمة الطلب',
+        value: formatCurrency(analyticsData.averageOrderValue),
+        icon: Package,
+        iconClassName: 'text-violet-700',
+        iconSurfaceClassName: 'bg-violet-50',
+        borderClassName: 'border-violet-100',
+      },
+    ],
+    [
+      analyticsData.averageOrderValue,
+      analyticsData.totalItemsSold,
+      analyticsData.totalOrders,
+      analyticsData.totalRevenue,
+    ]
+  );
 
   return (
     <section className="w-full space-y-6" dir="rtl" aria-label="لوحة التحليلات">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {cards.map((card, i) => {
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {metricCards.map((card, index) => {
           const Icon = card.icon;
+
           return (
-            <motion.div
+            <motion.article
               key={card.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, type: 'spring', stiffness: 300 }}
-              className={`flex flex-col items-start gap-4 rounded-3xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md sm:flex-row sm:items-center ${card.border}`}
+              transition={{ delay: index * 0.06, duration: 0.24, ease: 'easeOut' }}
+              className={`flex min-h-[116px] items-center gap-4 rounded-3xl border bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md ${card.borderClassName}`}
             >
               <div
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14 ${card.bg}`}
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${card.iconSurfaceClassName}`}
               >
-                <Icon
-                  className={`h-5 w-5 sm:h-6 sm:w-6 ${card.color}`}
-                  aria-hidden="true"
-                />
+                <Icon className={`h-5 w-5 ${card.iconClassName}`} aria-hidden="true" />
               </div>
-              <div className="mt-2 flex flex-col justify-center sm:mt-0">
-                <h2 className="mb-1 text-[11px] font-bold text-gray-500 sm:text-xs">
-                  {card.title}
-                </h2>
-                <p className="font-mono text-lg font-black tracking-tight text-gray-900 sm:text-xl">
+
+              <div className="min-w-0">
+                <h2 className="text-xs font-bold text-gray-500 sm:text-sm">{card.title}</h2>
+                <p className="mt-1 font-mono text-lg font-black tracking-tight text-gray-900 sm:text-2xl">
                   {card.value}
                 </p>
               </div>
-            </motion.div>
+            </motion.article>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.4 }}
-          className="flex h-[320px] flex-col rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:h-[400px] sm:p-6 lg:col-span-2"
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.24, duration: 0.24, ease: 'easeOut' }}
+          className="flex h-[340px] flex-col rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:h-[400px] sm:p-6 xl:col-span-8"
+          aria-labelledby="analytics-revenue-title"
         >
-          <h3 className="mb-4 flex shrink-0 items-center gap-2 text-lg font-black text-gray-800">
-            <TrendingUp className="h-5 w-5 text-[#2C643E]" aria-hidden="true" />
-            مؤشر الإيرادات (آخر 7 أيام)
-          </h3>
-          <div className="relative min-h-0 w-full flex-1">
-            <div className="absolute inset-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={10} minHeight={10}>
-                <AreaChart
-                  data={analyticsData.revenueChart}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2C643E" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#2C643E" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis
-                    dataKey="day"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{
-                      fill: '#9ca3af',
-                      fontSize: 12,
-                      fontWeight: 'bold',
-                      fontFamily: 'monospace',
-                    }}
-                    width={60}
-                    orientation="left"
-                  />
-                  <Tooltip
-                    content={<CustomTooltip />}
-                    cursor={{ stroke: '#2C643E', strokeWidth: 1, strokeDasharray: '4 4' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    name="revenue"
-                    stroke="#2C643E"
-                    strokeWidth={4}
-                    fillOpacity={1}
-                    fill="url(#colorRevenue)"
-                    activeDot={{ r: 6, strokeWidth: 0, fill: '#2C643E' }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          <header className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h3
+                id="analytics-revenue-title"
+                className="flex items-center gap-2 text-base font-black text-gray-900 sm:text-lg"
+              >
+                <TrendingUp className="h-5 w-5 text-[#2C643E]" aria-hidden="true" />
+                مؤشر الإيرادات خلال آخر 7 أيام
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                يعتمد على جميع الطلبات غير الملغاة ضمن النافذة الزمنية الحالية
+              </p>
             </div>
+          </header>
+
+          <div className="min-h-0 flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={analyticsData.revenueChart}
+                accessibilityLayer
+                margin={{ top: 12, right: 8, left: -24, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id={CHART_FILL_ID} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_STROKE} stopOpacity={0.28} />
+                    <stop offset="95%" stopColor={CHART_STROKE} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis
+                  dataKey="dayLabel"
+                  axisLine={false}
+                  tickLine={false}
+                  tickMargin={12}
+                  tick={{ fill: '#94A3B8', fontSize: 12, fontWeight: 700 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  width={64}
+                  tickMargin={12}
+                  tick={{ fill: '#94A3B8', fontSize: 12, fontWeight: 700, fontFamily: 'monospace' }}
+                  tickFormatter={(value: number) => currencyFormatter.format(value)}
+                />
+                <Tooltip
+                  cursor={{ stroke: CHART_STROKE, strokeWidth: 1, strokeDasharray: '4 4' }}
+                  content={<CustomTooltip />}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  name="revenue"
+                  stroke={CHART_STROKE}
+                  strokeWidth={3}
+                  fill={`url(#${CHART_FILL_ID})`}
+                  activeDot={{ r: 5, fill: CHART_STROKE, stroke: '#ffffff', strokeWidth: 2 }}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        </motion.div>
+        </motion.section>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5 }}
-          className="flex h-[320px] flex-col rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:h-[400px] sm:p-6 lg:col-span-1"
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.24, ease: 'easeOut' }}
+          className="flex h-[340px] flex-col rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:h-[400px] sm:p-6 xl:col-span-4"
+          aria-labelledby="analytics-top-products-title"
         >
-          <h3 className="mb-2 flex shrink-0 items-center gap-2 text-lg font-black text-gray-800">
-            <Package className="h-5 w-5 text-[#2C643E]" aria-hidden="true" />
-            المنتجات الأكثر مبيعاً
-          </h3>
+          <header className="mb-4">
+            <h3
+              id="analytics-top-products-title"
+              className="flex items-center gap-2 text-base font-black text-gray-900 sm:text-lg"
+            >
+              <Package className="h-5 w-5 text-[#2C643E]" aria-hidden="true" />
+              المنتجات الأكثر مبيعاً
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              أعلى العناصر حسب الكمية المباعة
+            </p>
+          </header>
 
-          <div className="custom-scrollbar mt-4 flex flex-1 flex-col justify-around gap-3 overflow-y-auto pr-1">
-            {analyticsData.topProducts.map((product, index) => {
-              const maxQty = Math.max(...analyticsData.topProducts.map((p) => p.qty), 1);
-              const widthPercentage = `${(product.qty / maxQty) * 100}%`;
-
-              return (
-                <div key={product.name} className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="truncate pl-2 font-bold text-gray-800">
-                      {product.name}
-                    </span>
-                    <span className="whitespace-nowrap font-mono text-xs font-bold text-gray-500">
-                      {product.qty.toLocaleString('en-US')} كجم
-                    </span>
-                  </div>
-
-                  <div
-                    className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100"
-                    dir="rtl"
-                    aria-hidden="true"
-                  >
-                    <motion.div
-                      initial={{ width: 0 }}
-                      whileInView={{ width: widthPercentage }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 1, ease: 'easeOut', delay: index * 0.1 }}
-                      className={`h-full rounded-full ${
-                        index === 0 ? 'bg-[#2C643E]' : 'bg-[#86efac]'
-                      }`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-
-            {analyticsData.topProducts.length === 0 && (
-              <div className="flex h-full items-center justify-center text-sm font-medium text-gray-400">
-                لا توجد بيانات مبيعات حتى الآن
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+            {analyticsData.topProducts.length === 0 ? (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 text-center text-sm font-medium text-gray-400">
+                {EMPTY_PRODUCT_STATE}
               </div>
+            ) : (
+              analyticsData.topProducts.map((product, index) => {
+                const widthPercentage =
+                  maxTopProductQty > 0 ? `${(product.qty / maxTopProductQty) * 100}%` : '0%';
+                const isTopRank = index === 0;
+
+                return (
+                  <div key={product.name} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate font-bold text-gray-900" title={product.name}>
+                        {product.name}
+                      </span>
+                      <span className="shrink-0 whitespace-nowrap font-mono text-xs font-bold text-gray-500">
+                        {formatQuantity(product.qty)}
+                      </span>
+                    </div>
+
+                    <div
+                      className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100"
+                      aria-hidden="true"
+                    >
+                      <motion.div
+                        initial={{ width: 0 }}
+                        whileInView={{ width: widthPercentage }}
+                        viewport={{ once: true, amount: 0.6 }}
+                        transition={{ duration: 0.7, delay: index * 0.06, ease: 'easeOut' }}
+                        className={`h-full rounded-full ${isTopRank ? 'bg-[#2C643E]' : 'bg-emerald-300'}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
-        </motion.div>
+        </motion.section>
       </div>
     </section>
   );
