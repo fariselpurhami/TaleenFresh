@@ -71,6 +71,9 @@ export default async function CustomerHomePage() {
                   <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.099 4.388 23.094 10.125 24v-8.438H7.078v-3.489h3.047V9.413c0-3.017 1.792-4.686 4.533-4.686 1.313 0 2.686.235 2.686.235v2.962H15.83c-1.491 0-1.956.928-1.956 1.88v2.257h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.099 24 12.073Z" />
                 </svg>
               </a>
+            </nav>
+          </div>
+
           <p className="text-sm font-light tracking-wide text-slate-500 md:text-lg">
             Nature&apos;s best produce, straight to your door.
           </p>
