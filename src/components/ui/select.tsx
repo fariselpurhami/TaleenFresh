@@ -28,6 +28,7 @@ const SelectValue = SelectPrimitive.Value
 export interface SelectTriggerProps
   extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> {
   size?: "sm" | "default"
+  children?: React.ReactNode;
 }
 
 const SelectTrigger = React.forwardRef<
