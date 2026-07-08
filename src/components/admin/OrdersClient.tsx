@@ -378,7 +378,7 @@ export default function OrdersClient() {
                 <footer className="mt-auto flex items-center justify-between border-t border-gray-100 bg-gray-50/80 p-4">
                   <Select
                     value={safeStatus}
-                    onValueChange={(value) => {
+                    onValueChange={(value: string) => {
                       if (!isOrderStatus(value)) {
                         return;
                       }
