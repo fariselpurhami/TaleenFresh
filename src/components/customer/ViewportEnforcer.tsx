@@ -1,66 +1,85 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 
 const MIN_WIDTH = 428;
-const DEFAULT_VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover';
+const DEFAULT_VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+const NARROW_VIEWPORT = `width=${MIN_WIDTH}, maximum-scale=1, user-scalable=no, viewport-fit=cover`;
 
-function getViewportContent(width: number): string {
-  return width > 0 && width < MIN_WIDTH
-    ? `width=${MIN_WIDTH}, viewport-fit=cover`
-    : DEFAULT_VIEWPORT;
-}
+// Extracted as a pure, deterministic function for V8 engine optimization
+const getViewportContent = (width: number): string =>
+  width > 0 && width < MIN_WIDTH ? NARROW_VIEWPORT : DEFAULT_VIEWPORT;
 
 export function ViewportEnforcer() {
+  const pathname = usePathname();
+  
+  // Isolate mutable state outside the React render cycle
+  const currentContentRef = useRef<string | null>(null);
+  const metaTagRef = useRef<HTMLMetaElement | null>(null);
+  const rAFRef = useRef<number | null>(null);
+
   useEffect(() => {
-    const applyViewport = () => {
-      const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-      if (meta) {
-        meta.setAttribute('content', getViewportContent(window.screen.width));
+    const updateDOM = () => {
+      // Evaluate based on hardware screen width as dictated by domain rules
+      const width = typeof window !== 'undefined' ? window.screen.width : 0;
+      const newContent = getViewportContent(width);
+
+      // 1. DOM Query Caching: Only query if uninitialized or detached by Next.js router
+      if (!metaTagRef.current || !metaTagRef.current.isConnected) {
+        metaTagRef.current = document.querySelector('meta[name="viewport"]');
+        
+        if (!metaTagRef.current) {
+          const meta = document.createElement('meta');
+          meta.name = 'viewport';
+          document.head.appendChild(meta);
+          metaTagRef.current = meta;
+        }
+      }
+
+      // 2. Mutation Diffing: Prevent layout thrashing by blocking redundant DOM writes
+      if (currentContentRef.current !== newContent) {
+        metaTagRef.current.setAttribute('content', newContent);
+        currentContentRef.current = newContent;
       }
     };
 
-    applyViewport();
+    // 3. Frame Throttling: Debounce OS-level events to the rendering pipeline
+    const handleResize = () => {
+      if (rAFRef.current !== null) cancelAnimationFrame(rAFRef.current);
+      rAFRef.current = requestAnimationFrame(updateDOM);
+    };
 
-    const orientation = window.screen.orientation;
+    // Execute immediately on mount or layout boundary shift
+    updateDOM();
+
+    const orientation = window.screen?.orientation;
     const supportsScreenOrientation = typeof orientation?.addEventListener === 'function';
 
-    window.addEventListener('resize', applyViewport, { passive: true });
-    window.addEventListener('orientationchange', applyViewport, { passive: true });
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
 
     if (supportsScreenOrientation) {
-      orientation.addEventListener('change', applyViewport);
+      orientation.addEventListener('change', handleResize);
     }
 
     return () => {
-      window.removeEventListener('resize', applyViewport);
-      window.removeEventListener('orientationchange', applyViewport);
+      if (rAFRef.current !== null) cancelAnimationFrame(rAFRef.current);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
 
       if (supportsScreenOrientation) {
-        orientation.removeEventListener('change', applyViewport);
+        orientation.removeEventListener('change', handleResize);
       }
     };
-  }, []);
+  }, [pathname]);
 
-  const blockingScript = `
-    (function() {
-      var w = window.screen.width;
-      if (w > 0 && w < ${MIN_WIDTH}) {
-        var m = document.querySelector('meta[name="viewport"]');
-        if (!m) {
-          m = document.createElement('meta');
-          m.name = 'viewport';
-          document.head.appendChild(m);
-        }
-        m.setAttribute('content', 'width=${MIN_WIDTH}, viewport-fit=cover');
-      }
-    })();
-  `.replace(/\s+/g, ' ').trim();
-
+  // 4. SSR Blocking Script: Minified IIFE to prevent FCP layout shift before React boots
   return (
     <script
-      dangerouslySetInnerHTML={{ __html: blockingScript }}
-      suppressHydrationWarning
+      dangerouslySetInnerHTML={{
+        __html: `!function(){var e=window.screen.width;if(e>0&&e<${MIN_WIDTH}){var t=document.querySelector('meta[name="viewport"]');t||(t=document.createElement("meta"),t.name="viewport",document.head.appendChild(t)),t.setAttribute("content","${NARROW_VIEWPORT}")}}();`
+      }}
     />
   );
 }
